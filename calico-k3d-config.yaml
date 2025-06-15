@@ -1,0 +1,46 @@
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: calico
+servers: 1
+agents: 2
+image: rancher/k3s:v1.33.1-k3s1
+subnet: "172.28.0.0/16"
+ports:
+  - port: 8080:80
+    nodeFilters:
+      - loadbalancer
+  - port: 6443:6443
+    nodeFilters:
+      - loadbalancer
+options:
+  k3s:
+    extraArgs:
+      # Disable default k3s network components to use Calico
+      - arg: --flannel-backend=none
+        nodeFilters:
+          - server:*
+      - arg: --disable-network-policy
+        nodeFilters:
+          - server:*
+      # Calico specific settings
+      - arg: --cluster-cidr=192.168.0.0/16
+        nodeFilters:
+          - server:*
+      - arg: --service-cidr=10.96.0.0/12
+        nodeFilters:
+          - server:*
+      # Disable traefik
+      - arg: --disable=traefik
+        nodeFilters:
+          - server:*
+registries:
+  mirrors:
+    registry1.dso.mil:
+      endpoint:
+        - http://registry1.dso.mil
+  configs:
+    registry1.dso.mil:
+      auth:
+        username: <IRONBANK_USERNAME>
+        password: <IRONBANK_PASSWORD>

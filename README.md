@@ -1,6 +1,6 @@
-# k3d with Podman and Cilium
+# k3d with Podman and eBPF-based CNIs (Cilium/Calico)
 
-A comprehensive guide for running k3d (Kubernetes in Docker) clusters using Podman as the container runtime with Cilium CNI for advanced networking, security, and observability features.
+A comprehensive guide for running k3d (Kubernetes in Docker) clusters using Podman as the container runtime with eBPF-based CNI solutions (Cilium or Calico) for advanced networking, security, and observability features.
 
 ## Table of Contents
 
@@ -18,16 +18,24 @@ A comprehensive guide for running k3d (Kubernetes in Docker) clusters using Podm
 This project demonstrates how to run k3d clusters with:
 
 - **Podman** as the container runtime (instead of Docker)
-- **Cilium** as the CNI for advanced networking features
-- **Hubble** for observability and metrics
-- **WireGuard** encryption for node-to-node traffic
-- **SPIRE** for mutual TLS authentication
+- **eBPF-based CNIs** - Choose between Cilium or Calico for advanced networking
+- **Cilium** features: Hubble observability, WireGuard encryption, SPIRE mTLS
+- **Calico** features: Network policies, BGP support, flexible IPAM
+- **Production-ready** configurations for both CNI options
+
+## CNI Options
+
+| **[Cilium](https://cilium.io/)** | **[Calico](https://www.tigera.io/project-calico/)** |
+|----------------------------------|-----------------------------------------------------|
+| ![Cilium Logo](https://cdn.jsdelivr.net/gh/cilium/cilium@main/Documentation/images/logo-dark.svg) | ![Calico Logo](https://www.tigera.io/app/uploads/2025/05/Calico_logo_white.svg) |
+| eBPF-native networking, observability, and security | Cloud-native networking and network security |
 
 ### Key Features
 
 - 🚀 Lightweight Kubernetes development environment
-- 🔒 Enhanced security with WireGuard encryption
-- 🔍 Full observability with Hubble UI and metrics
+- 🔄 Choice of CNI: Cilium or Calico (both eBPF-based)
+- 🔒 Enhanced security with encryption and network policies
+- 🔍 Full observability (Hubble UI for Cilium)
 - 🌐 Advanced networking with eBPF-based dataplane
 - 📦 Registry integration for private images
 - 🎯 Production-like development environment
@@ -44,6 +52,7 @@ This project demonstrates how to run k3d clusters with:
 | kubectl | Latest | Kubernetes CLI |
 | Helm | 3.x | Package management |
 | Cilium CLI | Latest | Cilium management |
+| calicoctl | v3.30.3+ | Calico management (optional) |
 
 ### System Requirements
 
@@ -127,15 +136,21 @@ Host localhost 127.0.0.1
     StrictHostKeyChecking no
 EOF
 
-# 4. Create cluster with Cilium
+# 4a. Create cluster with Cilium (default)
 make create-cluster
 make patch-nodes
 make install-prometheus-crds
 make install-cilium
 
+# 4b. OR create cluster with Calico
+make create-cluster K3D_CONFIG=k3d-calico-config.yaml
+make install-calico
+
 # 5. Verify installation
+# For Cilium:
 cilium status --wait
-kubectl get pods -n kube-system
+# For Calico:
+kubectl get pods -n calico-system
 ```
 
 ## Detailed Setup Guide
@@ -215,14 +230,18 @@ Host 127.0.0.1
 
 ### Step 4: Cluster Creation
 
+#### Option A: Cilium CNI
+
 Using the Makefile:
 
 ```bash
 # Run preflight checks
 make preflight
 
-# Create cluster
+# Create cluster with Cilium config (default)
 make create-cluster
+# OR explicitly specify config
+make create-cluster K3D_CONFIG=k3d-cilium-config.yaml
 
 # Patch nodes for BPF/cgroup support
 make patch-nodes
@@ -234,31 +253,33 @@ make install-prometheus-crds
 make install-cilium
 ```
 
-Or manually:
+#### Option B: Calico CNI
+
+Using the Makefile:
 
 ```bash
-# Create cluster
-k3d cluster create cilium --config cilium-k3d-config.yaml
+# Run preflight checks
+make preflight
 
-# Patch nodes
-for node in $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}'); do
-    docker exec -i $node /bin/sh -c '
-        mount bpffs -t bpf /sys/fs/bpf &&
-        mount --make-shared /sys/fs/bpf &&
-        mkdir -p /run/cilium/cgroupv2 &&
-        mount -t cgroup2 none /run/cilium/cgroupv2 &&
-        mount --make-shared /run/cilium/cgroupv2/
-    '
-done
+# Create cluster with Calico config
+make create-cluster K3D_CONFIG=k3d-calico-config.yaml
 
-# Install Prometheus CRDs (for ServiceMonitor support)
-kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/bundle.yaml
+# Install Calico
+make install-calico
+```
 
-# Install Cilium
-cilium install -f cilium-values.yml --wait
+#### Custom Configuration
+
+You can use any k3d configuration file:
+
+```bash
+# Use custom config and cluster name
+make create-cluster CLUSTER_NAME=my-cluster K3D_CONFIG=my-custom-config.yaml
 ```
 
 ### Step 5: Verification
+
+#### For Cilium:
 
 ```bash
 # Check Cilium status
@@ -277,22 +298,72 @@ kubectl get nodes
 kubectl get pods -n kube-system | grep cilium
 ```
 
+#### For Calico:
+
+```bash
+# Check Calico pods
+kubectl get pods -n calico-system
+kubectl get pods -n tigera-operator
+
+# Check nodes
+kubectl get nodes -o wide
+
+# Verify Calico is running
+kubectl get felixconfiguration -o yaml
+
+# Check IP pools
+kubectl get ippools -o wide
+
+# Check node status with calicoctl (if installed)
+kubectl exec -n calico-system calico-node-xxxxx -- calicoctl node status
+```
+
+### Step 6: Installing calicoctl (Optional for Calico)
+
+The `calicoctl` command line tool provides additional management capabilities for Calico:
+
+```bash
+# macOS
+curl -L https://github.com/projectcalico/calico/releases/download/v3.30.3/calicoctl-darwin-amd64 -o calicoctl
+chmod +x calicoctl
+sudo mv calicoctl /usr/local/bin/
+
+# Linux
+curl -L https://github.com/projectcalico/calico/releases/download/v3.30.3/calicoctl-linux-amd64 -o calicoctl
+chmod +x calicoctl
+sudo mv calicoctl /usr/local/bin/
+
+# Configure calicoctl
+export DATASTORE_TYPE=kubernetes
+export KUBECONFIG=~/.kube/config
+
+# Verify installation
+calicoctl version
+```
+
 ## Configuration Reference
 
 ### Makefile Targets
 
-| Target | Description | Dependencies |
-|--------|-------------|--------------|
-| `help` | Show available commands | - |
-| `preflight` | Check required tools | - |
-| `create-cluster` | Create k3d cluster | preflight |
-| `patch-nodes` | Configure BPF mounts | create-cluster |
-| `install-prometheus-crds` | Install Prometheus CRDs for ServiceMonitor support | - |
-| `install-cilium` | Install Cilium CNI | patch-nodes |
-| `uninstall-cilium` | Remove Cilium | - |
-| `delete-cluster` | Delete k3d cluster | - |
+| Target | Description | Dependencies | Variables |
+| `help` | Show available commands | - | - |
+| `preflight` | Check required tools | - | - |
+| `create-cluster` | Create k3d cluster | preflight | `K3D_CONFIG`, `CLUSTER_NAME` |
+| `patch-nodes` | Configure BPF mounts (Cilium) | create-cluster | - |
+| `install-prometheus-crds` | Install Prometheus CRDs | - | - |
+| `install-gateway-api` | Install Gateway API CRDs | - | - |
+| `install-cilium` | Install Cilium CNI | patch-nodes | - |
+| `uninstall-cilium` | Remove Cilium | - | - |
+| `install-calico` | Install Calico CNI | create-cluster | - |
+| `uninstall-calico` | Remove Calico | - | - |
+| `delete-cluster` | Delete k3d cluster | - | `CLUSTER_NAME` |
 
-### k3d Configuration (`cilium-k3d-config.yaml`)
+| `create-calico-cluster` | Create Calico cluster | preflight | `CALICO_CLUSTER_NAME` |
+| `delete-calico-cluster` | Delete Calico cluster | - | `CALICO_CLUSTER_NAME` |
+
+### k3d Configuration
+
+#### Cilium Configuration (`k3d-cilium-config.yaml`)
 
 ```yaml
 apiVersion: k3d.io/v1alpha5
@@ -330,6 +401,46 @@ registries:
       auth:
         username: <username>
         password: <password>
+```
+
+#### Calico Configuration (`calico-k3d-config.yaml`)
+
+```yaml
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: calico
+servers: 1                      # Control plane nodes
+agents: 2                       # Worker nodes
+image: rancher/k3s:v1.33.1-k3s1 # k3s version
+subnet: "172.28.0.0/16"         # Cluster subnet
+ports:
+  - port: 8080:80               # Expose port 80 as 8080
+    nodeFilters:
+      - loadbalancer
+  - port: 6443:6443             # API server port
+    nodeFilters:
+      - loadbalancer
+options:
+  k3s:
+    extraArgs:
+      # Disable default CNI for Calico
+      - arg: --flannel-backend=none
+        nodeFilters:
+          - server:*
+      - arg: --disable-network-policy
+        nodeFilters:
+          - server:*
+      # Calico specific settings
+      - arg: --cluster-cidr=192.168.0.0/16
+        nodeFilters:
+          - server:*
+      - arg: --service-cidr=10.96.0.0/12
+        nodeFilters:
+          - server:*
+      - arg: --disable=traefik
+        nodeFilters:
+          - server:*
 ```
 
 ### Cilium Values (`cilium-values.yml`)
@@ -386,6 +497,21 @@ encryption:
   type: wireguard
   nodeEncryption: true
 ```
+
+### Calico Configuration
+
+The default Calico installation provides:
+
+- **IPAM**: Calico's IP Address Management
+- **Network Policy**: Full Kubernetes NetworkPolicy support plus Calico-specific policies
+- **Data Store**: Kubernetes API server (no etcd required)
+- **Default CIDR**: 192.168.0.0/16 for pod networking
+- **Service CIDR**: 10.96.0.0/12 for Kubernetes services
+- **BGP**: Optional BGP routing for advanced networking scenarios
+- **Multiple Dataplane Options**:
+  - **Standard (iptables)**: Default Linux dataplane using iptables/ipsets
+  - **eBPF**: High-performance dataplane using eBPF programs
+  - **VPP**: Vector Packet Processing for extreme performance (experimental)
 
 ## Troubleshooting
 
@@ -472,11 +598,90 @@ nslookup: can't resolve 'kubernetes.default'
 # Check CoreDNS
 kubectl get pods -n kube-system -l k8s-app=kube-dns
 
-# Verify Cilium DNS proxy
+# For Cilium - Verify DNS proxy
 kubectl exec -n kube-system ds/cilium -- cilium config view | grep dns
+
+# For Calico - Check DNS configuration
+kubectl get endpoints -n kube-system kube-dns
 
 # Test DNS
 kubectl run test-dns --image=busybox:1.28 --rm -it -- nslookup kubernetes.default
+```
+
+#### 5. Calico-Specific Issues
+
+**Problem**: Calico pods stuck in Init or CrashLoopBackOff
+
+```bash
+Error: calico-node pods not ready
+```
+
+**Solution**:
+
+```bash
+# Check logs
+kubectl logs -n calico-system -l k8s-app=calico-node
+
+# Verify operator logs
+kubectl logs -n tigera-operator deployment/tigera-operator
+
+# Check node configuration
+kubectl get nodes -o yaml | grep -A5 "podCIDR"
+```
+
+**Problem**: Pods cannot communicate across nodes (Calico)
+
+```bash
+# Test connectivity
+kubectl run test-pod --image=busybox --rm -it -- sh
+/ # ping <pod-ip-on-different-node>
+```
+
+**Solution**:
+
+```bash
+# Check Calico node status
+kubectl get pods -n calico-system -o wide
+
+# Verify BGP peers (if using BGP)
+kubectl exec -n calico-system calico-node-xxxxx -- calicoctl node status
+
+# Check IP pools
+kubectl get ippools -o yaml
+
+# Verify IPIP tunnel status
+kubectl exec -n calico-system ds/calico-node -- ip tunnel show
+
+# Check routing table
+kubectl exec -n calico-system ds/calico-node -- ip route
+
+# Verify iptables rules
+kubectl exec -n calico-system ds/calico-node -- iptables-save | grep -i calico
+```
+
+**Problem**: Calico eBPF mode issues
+
+```bash
+Error: BPF dataplane not working correctly
+```
+
+**Solution**:
+
+```bash
+# Verify eBPF is enabled
+kubectl get felixconfiguration default -o yaml | grep bpfEnabled
+
+# Check BPF maps
+kubectl exec -n calico-system ds/calico-node -- bpftool map list
+
+# Verify BPF programs are loaded
+kubectl exec -n calico-system ds/calico-node -- bpftool prog list
+
+# Check for BPF-related errors
+kubectl logs -n calico-system -l k8s-app=calico-node | grep -i bpf
+
+# Ensure kernel has BPF support
+kubectl exec -n calico-system ds/calico-node -- grep CONFIG_BPF /boot/config-$(uname -r)
 ```
 
 ### Debug Commands
@@ -499,14 +704,86 @@ kubectl -n kube-system exec ds/cilium -- cilium monitor
 hubble status
 hubble observe
 
-# Network policies
+# Cilium network policies
 kubectl get cnp -A
 kubectl get ccnp
+
+# Calico status
+kubectl get pods -n calico-system
+kubectl get pods -n tigera-operator
+
+# Calico specific resources
+kubectl get felixconfigurations
+kubectl get ippools
+kubectl get ipamblocks
+kubectl get networkpolicies -A
+
+# Calico network policies
+kubectl get networkpolicies.projectcalico.org -A
+kubectl get globalnetworkpolicies
+
+# Using calicoctl from inside a pod (if calicoctl not installed locally)
+kubectl exec -n calico-system deployment/calico-kube-controllers -- calicoctl get nodes
+kubectl exec -n calico-system deployment/calico-kube-controllers -- calicoctl get ippools
+kubectl exec -n calico-system deployment/calico-kube-controllers -- calicoctl get workloadendpoints
+
+# Check Calico node connectivity
+kubectl exec -n calico-system ds/calico-node -- calicoctl node status
+kubectl exec -n calico-system ds/calico-node -- calicoctl get bgppeers
+
+# Debug Calico dataplane
+kubectl exec -n calico-system ds/calico-node -- calico-node -felix-live -felix-ready
+
+# View Calico logs
+kubectl logs -n calico-system -l k8s-app=calico-node --tail=100
+kubectl logs -n tigera-operator deployment/tigera-operator --tail=100
 ```
+
+## Understanding eBPF
+
+<p align="center">
+  <img src="https://ebpf.io/static/logo-black-98b7a1413b4a74ed961d292cf83da82e.svg" alt="eBPF Logo" width="300"/>
+</p>
+
+### What is eBPF?
+
+[eBPF (extended Berkeley Packet Filter)](https://ebpf.io/) is a revolutionary technology that enables programmable kernel-level functionality without modifying kernel source code or loading kernel modules. Both Cilium and Calico leverage eBPF to provide high-performance, secure networking.
+
+### Key Benefits of eBPF
+
+- **Performance**: Run networking logic in kernel space for minimal overhead
+- **Security**: Implement fine-grained security policies at the kernel level
+- **Observability**: Deep visibility into network traffic and system behavior
+- **Flexibility**: Dynamically update networking behavior without restarts
+
+### How CNIs Use eBPF
+
+#### Cilium
+
+- **Native eBPF**: Built from the ground up on eBPF
+- **kube-proxy replacement**: Full eBPF-based load balancing
+- **Network policies**: Enforced in kernel with eBPF programs
+- **Visibility**: Hubble leverages eBPF for deep observability
+
+#### Calico
+
+- **eBPF dataplane**: Optional high-performance mode
+- **XDP support**: eXpress Data Path for fast packet processing
+- **Policy enforcement**: eBPF programs for efficient rule matching
+- **Hybrid mode**: Can run with or without eBPF
+
+### Learn More
+
+- [eBPF Official Website](https://ebpf.io/)
+- [eBPF Summit Videos](https://ebpf.io/summit-2024/)
+- [Cilium eBPF Documentation](https://docs.cilium.io/en/stable/bpf/)
+- [Calico eBPF Documentation](https://docs.tigera.io/calico/latest/operations/ebpf/)
 
 ## Advanced Topics
 
 ### Custom Network Policies
+
+#### Cilium Network Policy
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -525,6 +802,52 @@ spec:
         - ports:
             - port: "8080"
               protocol: TCP
+```
+
+#### Calico Network Policy
+
+```yaml
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: allow-nginx-ingress
+  namespace: default
+spec:
+  selector: app == "nginx"
+  types:
+  - Ingress
+  ingress:
+  - action: Allow
+    protocol: TCP
+    source:
+      selector: app == "client"
+    destination:
+      ports:
+      - 80
+```
+
+#### Calico Global Network Policy
+
+Global policies apply across all namespaces:
+
+```yaml
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: deny-egress-to-private
+spec:
+  selector: all()
+  types:
+  - Egress
+  egress:
+  - action: Deny
+    protocol: TCP
+    destination:
+      nets:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+  - action: Allow  # Allow everything else
 ```
 
 ### Enabling Additional Features
@@ -549,6 +872,8 @@ cilium install --set bgpControlPlane.enabled=true
 
 ### Performance Tuning
 
+#### Cilium Performance Settings
+
 ```yaml
 # High-performance settings
 cilium:
@@ -557,6 +882,298 @@ cilium:
     bpf-policy-map-max: "65536"
     bpf-lb-map-max: "65536"
     preallocate-bpf-maps: "true"
+```
+
+#### Calico Performance Tuning
+
+```bash
+# Adjust Felix configuration
+kubectl patch felixconfiguration default --type='merge' -p '{"spec":{"prometheusMetricsEnabled":true}}'
+
+# Enable fast datapath (eBPF)
+kubectl patch felixconfiguration default --type='merge' -p '{"spec":{"bpfEnabled":true}}'
+
+# Advanced Felix tuning for high-performance environments
+cat <<EOF | kubectl apply -f -
+apiVersion: projectcalico.org/v3
+kind: FelixConfiguration
+metadata:
+  name: default
+spec:
+  bpfEnabled: true
+  bpfDataIfacePattern: "^(eth|ens|enp|wl)"
+  bpfLogLevel: "Info"
+  floatingIPs: Enabled
+  logSeverityScreen: Info
+  prometheusMetricsEnabled: true
+  prometheusMetricsPort: 9091
+  ipipEnabled: true
+  vxlanEnabled: false
+  wireguardEnabled: false
+  failsafeInboundHostPorts:
+  - protocol: tcp
+    port: 22
+  - protocol: tcp
+    port: 443
+  - protocol: tcp
+    port: 6443
+  failsafeOutboundHostPorts:
+  - protocol: tcp
+    port: 443
+  - protocol: udp
+    port: 53
+  - protocol: tcp
+    port: 53
+EOF
+
+# Configure Calico for high connection environments
+kubectl patch felixconfiguration default --type='merge' -p '{
+  "spec": {
+    "conntrackMaxPerCore": 131072,
+    "natPortRange": "32768:65535",
+    "natOutgoingInterfaceFilter": "eth0"
+  }
+}'
+
+# Enable BPF connection-time load balancing
+kubectl patch felixconfiguration default --type='merge' -p '{
+  "spec": {
+    "bpfConnectTimeLoadBalancingEnabled": true,
+    "bpfExternalServiceMode": "DSR"
+  }
+}'
+```
+
+#### Switching Calico Dataplane Modes
+
+Switch between different Calico dataplane modes:
+
+```bash
+# Switch to eBPF dataplane (requires kernel 5.3+)
+kubectl patch felixconfiguration default --type='merge' -p '{"spec":{"bpfEnabled":true}}'
+
+# Verify eBPF mode is active
+kubectl logs -n calico-system -l k8s-app=calico-node | grep -i "BPF dataplane is in use"
+
+# Switch back to standard iptables dataplane
+kubectl patch felixconfiguration default --type='merge' -p '{"spec":{"bpfEnabled":false}}'
+
+# Configure eBPF with specific settings
+cat <<EOF | kubectl apply -f -
+apiVersion: projectcalico.org/v3
+kind: FelixConfiguration
+metadata:
+  name: default
+spec:
+  bpfEnabled: true
+  bpfKubeProxyIptablesCleanupEnabled: true
+  bpfKubeProxyMinSyncPeriod: 1s
+  bpfExtToServiceConnmark: 0x80000000
+  bpfDataIfacePattern: "^(eth|ens|enp|wl)"
+  bpfLogLevel: "Info"
+EOF
+```
+
+### Calico-Specific Advanced Features
+
+#### BGP Configuration
+
+Enable BGP for advanced routing scenarios:
+
+```yaml
+apiVersion: projectcalico.org/v3
+kind: BGPConfiguration
+metadata:
+  name: default
+spec:
+  logSeverityScreen: Info
+  nodeToNodeMeshEnabled: true
+  asNumber: 64512
+  serviceClusterIPs:
+  - cidr: 10.96.0.0/12
+  serviceExternalIPs:
+  - cidr: 10.100.0.0/16
+```
+
+Configure BGP peers:
+
+```yaml
+apiVersion: projectcalico.org/v3
+kind: BGPPeer
+metadata:
+  name: external-router
+spec:
+  peerIP: 172.16.1.1
+  asNumber: 64513
+  nodeSelector: "!all()"  # Apply to specific nodes
+```
+
+Per-node BGP configuration:
+
+```yaml
+apiVersion: projectcalico.org/v3
+kind: Node
+metadata:
+  name: k3d-calico-server-0
+spec:
+  bgp:
+    ipv4Address: 172.28.0.2/16
+    ipv4IPIPTunnelAddr: 192.168.255.1
+```
+
+#### IP Pool Management
+
+Create custom IP pools for different workloads:
+
+```yaml
+apiVersion: projectcalico.org/v3
+kind: IPPool
+metadata:
+  name: production-pool
+spec:
+  cidr: 192.168.1.0/24
+  ipipMode: Never
+  natOutgoing: true
+  disabled: false
+  nodeSelector: environment == "production"
+```
+
+Configure IPIP tunneling modes:
+
+```yaml
+apiVersion: projectcalico.org/v3
+kind: IPPool
+metadata:
+  name: cross-subnet-pool
+spec:
+  cidr: 192.168.2.0/24
+  ipipMode: CrossSubnet  # Options: Always, CrossSubnet, Never
+  vxlanMode: Never       # Options: Always, CrossSubnet, Never
+  natOutgoing: true
+  disabled: false
+```
+
+Example: Creating separate IP pools for different namespaces:
+
+```bash
+# Create a pool for development namespace
+cat <<EOF | kubectl apply -f -
+apiVersion: projectcalico.org/v3
+kind: IPPool
+metadata:
+  name: dev-pool
+spec:
+  cidr: 192.168.10.0/24
+  ipipMode: Never
+  natOutgoing: true
+  disabled: false
+  nodeSelector: environment == "development"
+EOF
+
+# Create a pool with VXLAN for cloud environments
+cat <<EOF | kubectl apply -f -
+apiVersion: projectcalico.org/v3
+kind: IPPool
+metadata:
+  name: cloud-pool
+spec:
+  cidr: 192.168.20.0/24
+  ipipMode: Never
+  vxlanMode: Always
+  natOutgoing: true
+  disabled: false
+EOF
+
+# Annotate namespace to use specific pool
+kubectl annotate namespace development projectcalico.org/ipv4pools='["dev-pool"]'
+kubectl annotate namespace cloud projectcalico.org/ipv4pools='["cloud-pool"]'
+```
+
+#### Calico Workload Endpoints
+
+View and manage workload endpoints:
+
+```bash
+# List all workload endpoints
+kubectl get workloadendpoints -A
+
+# Get detailed workload endpoint info
+kubectl get workloadendpoints -o yaml
+
+# Using calicoctl for more details
+kubectl exec -n calico-system deployment/calico-kube-controllers -- calicoctl get workloadendpoints -o wide
+
+# Filter workload endpoints by namespace
+kubectl exec -n calico-system deployment/calico-kube-controllers -- calicoctl get workloadendpoints --namespace=default
+```
+
+Create host endpoints for bare metal or VM scenarios:
+
+```yaml
+apiVersion: projectcalico.org/v3
+kind: HostEndpoint
+metadata:
+  name: host-eth0
+  labels:
+    environment: production
+spec:
+  interfaceName: eth0
+  node: k3d-calico-server-0
+  expectedIPs:
+  - 172.28.0.2
+```
+
+#### Calico Monitoring and Observability
+
+Enable Prometheus metrics for Calico:
+
+```bash
+# Enable metrics in Felix
+kubectl patch felixconfiguration default --type='merge' -p '{
+  "spec": {
+    "prometheusMetricsEnabled": true,
+    "prometheusMetricsPort": 9091,
+    "prometheusProcessMetricsEnabled": true
+  }
+}'
+
+# Create ServiceMonitor for Prometheus Operator
+cat <<EOF | kubectl apply -f -
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: calico-node
+  namespace: calico-system
+spec:
+  selector:
+    matchLabels:
+      k8s-app: calico-node
+  endpoints:
+  - port: http-metrics
+    interval: 30s
+    path: /metrics
+EOF
+
+# Enable Typha metrics (if using Typha)
+kubectl set env -n calico-system deployment/calico-typha TYPHA_PROMETHEUSMETRICSENABLED=true
+kubectl set env -n calico-system deployment/calico-typha TYPHA_PROMETHEUSMETRICSPORT=9093
+```
+
+View Calico metrics:
+
+```bash
+# Port-forward to access metrics
+kubectl port-forward -n calico-system ds/calico-node 9091:9091
+
+# In another terminal, view metrics
+curl http://localhost:9091/metrics | grep felix
+
+# Key metrics to monitor:
+# - felix_cluster_num_workload_endpoints
+# - felix_cluster_num_hosts
+# - felix_iptables_restore_calls
+# - felix_ipset_calls
+# - felix_route_table_list_seconds
 ```
 
 ### Multi-cluster Setup
@@ -573,11 +1190,27 @@ cilium clustermesh connect --context k3d-cilium --destination-context k3d-cluste
 
 ## Resources
 
+### Project Documentation
+
 - [k3d Documentation](https://k3d.io/v5.8.3/)
-- [Cilium Documentation](https://docs.cilium.io/en/stable/)
 - [k3s Documentation](https://docs.k3s.io/)
 - [Podman Documentation](https://docs.podman.io/)
+
+### CNI Documentation
+
+- [Cilium Official Site](https://cilium.io/)
+- [Cilium Documentation](https://docs.cilium.io/en/stable/)
 - [Hubble Documentation](https://docs.cilium.io/en/stable/gettingstarted/hubble/)
+- [Calico Official Site](https://www.tigera.io/project-calico/)
+- [Calico Documentation](https://docs.tigera.io/calico/latest/about/)
+- [Calico Network Policies](https://docs.tigera.io/calico/latest/network-policy/)
+- [Calico BGP Documentation](https://docs.tigera.io/calico/latest/networking/bgp/)
+- [Calico IP Pool Management](https://docs.tigera.io/calico/latest/networking/ipam/)
+
+### eBPF Resources
+
+- [eBPF Official Site](https://ebpf.io/)
+- [eBPF Summit](https://ebpf.io/summit-2024/)
 
 ## Contributing
 
