@@ -346,6 +346,7 @@ calicoctl version
 ### Makefile Targets
 
 | Target | Description | Dependencies | Variables |
+|--------|-------------|--------------|-----------|
 | `help` | Show available commands | - | - |
 | `preflight` | Check required tools | - | - |
 | `create-cluster` | Create k3d cluster | preflight | `K3D_CONFIG`, `CLUSTER_NAME` |
@@ -357,7 +358,6 @@ calicoctl version
 | `install-calico` | Install Calico CNI | create-cluster | - |
 | `uninstall-calico` | Remove Calico | - | - |
 | `delete-cluster` | Delete k3d cluster | - | `CLUSTER_NAME` |
-
 | `create-calico-cluster` | Create Calico cluster | preflight | `CALICO_CLUSTER_NAME` |
 | `delete-calico-cluster` | Delete Calico cluster | - | `CALICO_CLUSTER_NAME` |
 
