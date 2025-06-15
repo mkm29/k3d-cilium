@@ -6,6 +6,7 @@ A comprehensive guide for running k3d (Kubernetes in Docker) clusters using Podm
 
 - [Overview](#overview)
 - [Prerequisites](#prerequisites)
+- [Understanding eBPF](#understanding-ebpf)
 - [Architecture](#architecture)
 - [Quick Start](#quick-start)
 - [Detailed Setup Guide](#detailed-setup-guide)
@@ -61,6 +62,46 @@ This project demonstrates how to run k3d clusters with:
 - **CPU**: 4+ cores recommended
 - **Disk**: 50GB+ available space
 - **Kernel**: Linux kernel 5.4+ (for Cilium)
+
+## Understanding eBPF
+
+<p align="center">
+  <img src="https://ebpf.io/static/logo-black-98b7a1413b4a74ed961d292cf83da82e.svg" alt="eBPF Logo" width="300"/>
+</p>
+
+### What is eBPF?
+
+[eBPF (extended Berkeley Packet Filter)](https://ebpf.io/) is a revolutionary technology that enables programmable kernel-level functionality without modifying kernel source code or loading kernel modules. Both Cilium and Calico leverage eBPF to provide high-performance, secure networking.
+
+### Key Benefits of eBPF
+
+- **Performance**: Run networking logic in kernel space for minimal overhead
+- **Security**: Implement fine-grained security policies at the kernel level
+- **Observability**: Deep visibility into network traffic and system behavior
+- **Flexibility**: Dynamically update networking behavior without restarts
+
+### How CNIs Use eBPF
+
+#### Cilium
+
+- **Native eBPF**: Built from the ground up on eBPF
+- **kube-proxy replacement**: Full eBPF-based load balancing
+- **Network policies**: Enforced in kernel with eBPF programs
+- **Visibility**: Hubble leverages eBPF for deep observability
+
+#### Calico
+
+- **eBPF dataplane**: Optional high-performance mode
+- **XDP support**: eXpress Data Path for fast packet processing
+- **Policy enforcement**: eBPF programs for efficient rule matching
+- **Hybrid mode**: Can run with or without eBPF
+
+### Learn More
+
+- [eBPF Official Website](https://ebpf.io/)
+- [eBPF Summit Videos](https://ebpf.io/summit-2024/)
+- [Cilium eBPF Documentation](https://docs.cilium.io/en/stable/bpf/)
+- [Calico eBPF Documentation](https://docs.tigera.io/calico/latest/operations/ebpf/)
 
 ## Architecture
 
@@ -738,46 +779,6 @@ kubectl exec -n calico-system ds/calico-node -- calico-node -felix-live -felix-r
 kubectl logs -n calico-system -l k8s-app=calico-node --tail=100
 kubectl logs -n tigera-operator deployment/tigera-operator --tail=100
 ```
-
-## Understanding eBPF
-
-<p align="center">
-  <img src="https://ebpf.io/static/logo-black-98b7a1413b4a74ed961d292cf83da82e.svg" alt="eBPF Logo" width="300"/>
-</p>
-
-### What is eBPF?
-
-[eBPF (extended Berkeley Packet Filter)](https://ebpf.io/) is a revolutionary technology that enables programmable kernel-level functionality without modifying kernel source code or loading kernel modules. Both Cilium and Calico leverage eBPF to provide high-performance, secure networking.
-
-### Key Benefits of eBPF
-
-- **Performance**: Run networking logic in kernel space for minimal overhead
-- **Security**: Implement fine-grained security policies at the kernel level
-- **Observability**: Deep visibility into network traffic and system behavior
-- **Flexibility**: Dynamically update networking behavior without restarts
-
-### How CNIs Use eBPF
-
-#### Cilium
-
-- **Native eBPF**: Built from the ground up on eBPF
-- **kube-proxy replacement**: Full eBPF-based load balancing
-- **Network policies**: Enforced in kernel with eBPF programs
-- **Visibility**: Hubble leverages eBPF for deep observability
-
-#### Calico
-
-- **eBPF dataplane**: Optional high-performance mode
-- **XDP support**: eXpress Data Path for fast packet processing
-- **Policy enforcement**: eBPF programs for efficient rule matching
-- **Hybrid mode**: Can run with or without eBPF
-
-### Learn More
-
-- [eBPF Official Website](https://ebpf.io/)
-- [eBPF Summit Videos](https://ebpf.io/summit-2024/)
-- [Cilium eBPF Documentation](https://docs.cilium.io/en/stable/bpf/)
-- [Calico eBPF Documentation](https://docs.tigera.io/calico/latest/operations/ebpf/)
 
 ## Advanced Topics
 
