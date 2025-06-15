@@ -96,18 +96,18 @@ graph TB
 
     style PM fill:#9bcb3c,stroke:#373737,stroke-width:2px,color:#333
     style PD fill:#e8282b,stroke:#373737,stroke-width:2px,color:#333
-    style K3D fill:#8162aa,stroke:#FFFFFF,stroke-width:2px,color:#333
-    style PC fill:#e8282b,stroke:#E96D04,stroke-width:2px,color:#333
-    style LB fill:#007BFF,stroke:#0056B3,stroke-width:2px,color:#333
-    style S1 fill:#117A8B,stroke:#FFFFFF,stroke-width:2px,color:#333
-    style A1 fill:#FFFFFF,stroke:#117A8B,stroke-width:2px,color:#333
-    style A2 fill:#FFFFFF,stroke:#117A8B,stroke-width:2px,color:#333
+    style K3D fill:#8162aa,stroke:#373737,stroke-width:2px,color:#FFF
+    style PC fill:#e8282b,stroke:#373737,stroke-width:2px,color:#333
+    style LB fill:#007BFF,stroke:#373737,stroke-width:2px,color:#333
+    style S1 fill:#373737,stroke:#373737,stroke-width:2px,color:#FFF
+    style A1 fill:#FFFFFF,stroke:#373737,stroke-width:2px,color:#333
+    style A2 fill:#FFFFFF,stroke:#373737,stroke-width:2px,color:#333
     style CA fill:#f07525,stroke:#373737,stroke-width:2px,color:#333
     style CO fill:#f8c519,stroke:#373737,stroke-width:2px,color:#333
     style HU fill:#6389c6,stroke:#373737,stroke-width:2px,color:#333
     style HR fill:#e8282b,stroke:#373737,stroke-width:2px,color:#333
     style SP fill:#8162aa,stroke:#373737,stroke-width:2px,color:#333
-    style REG fill:#6F42C1,stroke:#5A32A3,stroke-width:2px,color:#333
+    style REG fill:#373737,stroke:#373737,stroke-width:2px,color:#333
 ```
 
 ## Quick Start
