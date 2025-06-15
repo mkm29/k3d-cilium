@@ -96,12 +96,12 @@ graph TB
 
     style PM fill:#9bcb3c,stroke:#373737,stroke-width:2px,color:#333
     style PD fill:#e8282b,stroke:#373737,stroke-width:2px,color:#333
-    style K3D fill:#8162aa,stroke:#373737,stroke-width:2px,color:#333
+    style K3D fill:#8162aa,stroke:#FFFFFF,stroke-width:2px,color:#333
     style PC fill:#e8282b,stroke:#E96D04,stroke-width:2px,color:#333
     style LB fill:#007BFF,stroke:#0056B3,stroke-width:2px,color:#333
-    style S1 fill:#007BFF,stroke:#0056B3,stroke-width:2px,color:#333
-    style A1 fill:#17A2B8,stroke:#117A8B,stroke-width:2px,color:#333
-    style A2 fill:#17A2B8,stroke:#117A8B,stroke-width:2px,color:#333
+    style S1 fill:#117A8B,stroke:#FFFFFF,stroke-width:2px,color:#333
+    style A1 fill:#FFFFFF,stroke:#117A8B,stroke-width:2px,color:#333
+    style A2 fill:#FFFFFF,stroke:#117A8B,stroke-width:2px,color:#333
     style CA fill:#f07525,stroke:#373737,stroke-width:2px,color:#333
     style CO fill:#f8c519,stroke:#373737,stroke-width:2px,color:#333
     style HU fill:#6389c6,stroke:#373737,stroke-width:2px,color:#333
@@ -130,6 +130,7 @@ EOF
 # 4. Create cluster with Cilium
 make create-cluster
 make patch-nodes
+make install-prometheus-crds
 make install-cilium
 
 # 5. Verify installation
@@ -226,6 +227,9 @@ make create-cluster
 # Patch nodes for BPF/cgroup support
 make patch-nodes
 
+# Install Prometheus CRDs (for ServiceMonitor support)
+make install-prometheus-crds
+
 # Install Cilium
 make install-cilium
 ```
@@ -246,6 +250,9 @@ for node in $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}'); do
         mount --make-shared /run/cilium/cgroupv2/
     '
 done
+
+# Install Prometheus CRDs (for ServiceMonitor support)
+kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/bundle.yaml
 
 # Install Cilium
 cilium install -f cilium-values.yml --wait
@@ -280,6 +287,7 @@ kubectl get pods -n kube-system | grep cilium
 | `preflight` | Check required tools | - |
 | `create-cluster` | Create k3d cluster | preflight |
 | `patch-nodes` | Configure BPF mounts | create-cluster |
+| `install-prometheus-crds` | Install Prometheus CRDs for ServiceMonitor support | - |
 | `install-cilium` | Install Cilium CNI | patch-nodes |
 | `uninstall-cilium` | Remove Cilium | - |
 | `delete-cluster` | Delete k3d cluster | - |
@@ -352,6 +360,8 @@ hubble:
       - http
     dashboards:
       enabled: true
+    serviceMonitor:
+      enabled: true  # Requires Prometheus CRDs
   relay:
     enabled: true
   ui:

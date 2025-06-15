@@ -43,14 +43,8 @@ create-cluster: preflight ## Create a k3d cluster with Cilium
 	@k3d cluster create $(CLUSTER_NAME) --config cilium-k3d-config.yaml
 	@echo "Cluster $(CLUSTER_NAME) created successfully."
 
-.PHONY: delete-cluster
-delete-cluster: ## Delete the k3d cluster
-	@echo "Deleting k3d cluster $(CLUSTER_NAME)..."
-	@k3d cluster delete $(CLUSTER_NAME)
-	@echo "Cluster $(CLUSTER_NAME) deleted successfully."
-
 .PHONY: patch-nodes
-patch-nodes: create-cluster ## Patch nodes to mount BPF filesystem
+patch-nodes: ## Patch nodes to mount BPF filesystem
 	@echo "Patching nodes to mount BPF filesystem..."
 	@if ! k3d cluster list | grep -q $(CLUSTER_NAME); then \
 		echo "Cluster $(CLUSTER_NAME) does not exist. Please create the cluster first."; \
@@ -68,8 +62,14 @@ patch-nodes: create-cluster ## Patch nodes to mount BPF filesystem
 	done
 	@echo "Nodes patched successfully."
 
+.PHONY: install-prometheus-crds
+install-prometheus-crds: ## Install Prometheus CRDs
+	@echo "Installing Prometheus CRDs..."
+	@kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/bundle.yaml || echo "Failed to apply Prometheus CRDs. Please check the URL or your network connection."
+	@echo "Prometheus CRDs installed successfully."
+
 .PHONY: install-cilium
-install-cilium: patch-nodes ## Install Cilium on the k3d cluster
+install-cilium: ## Install Cilium on the k3d cluster
 	@echo "Installing Cilium on the k3d cluster..."
 	@cilium install -f cilium-values.yaml --wait
 	@echo "Cilium installed successfully."
@@ -79,3 +79,9 @@ uninstall-cilium: ## Uninstall Cilium from the k3d cluster
 	@echo "Uninstalling Cilium from the k3d cluster..."
 	@cilium uninstall --wait
 	@echo "Cilium uninstalled successfully."
+
+.PHONY: delete-cluster
+delete-cluster: ## Delete the k3d cluster
+	@echo "Deleting k3d cluster $(CLUSTER_NAME)..."
+	@k3d cluster delete $(CLUSTER_NAME)
+	@echo "Cluster $(CLUSTER_NAME) deleted successfully."
