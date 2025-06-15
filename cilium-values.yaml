@@ -1,0 +1,102 @@
+bpf:
+  masquerade: true
+
+cluster:
+  name: k3d-cilium
+  id: 99
+
+kubeProxyReplacement: true
+
+hubble:
+  enabled: true
+  metrics:
+    enabled:
+    - dns:query;ignoreAAAA
+    - drop
+    - tcp
+    - flow
+    - icmp
+    - http
+    dashboards:
+      enabled: true
+    serviceMonitor:
+      enabled: false
+  relay:
+    enabled: true
+    prometheus:
+      enabled: true
+      serviceMonitor:
+        enabled: false
+  ui:
+    enabled: true
+
+ingressController:
+  enabled: true
+  default: true
+
+authentication:
+  mutual:
+    spire:
+      enabled: true
+      install:
+        enabled: true
+        server:
+          dataStorage:
+            enabled: true
+
+encryption:
+  enabled: true
+  type: wireguard
+  nodeEncryption: true
+  strictMode:
+    enabled: false
+
+
+# prometheus:
+#   enabled: true
+#   serviceMonitor:
+#     enabled: false
+# dashboards:
+#   enabled: true
+
+
+# version: 1.17.4
+# operator:
+#   replicas: 1
+#   prometheus:
+#     enabled: true
+#     serviceMonitor:
+#       enabled: false
+#   dashboards:
+#     enabled: true
+# envoy:
+#   prometheus:
+#     enabled: true
+#     serviceMonitor:
+#       enabled: false
+#     service:
+#       type: NodePort
+#     # tls:
+#     #   authMode: cluster
+#     #   server:
+#     #     extraDnsNames:
+#     #       - "*.{{ cilium_default_domain }}"
+
+# ipam:
+#   mode: kubernetes
+# socketLB:
+#   enabled: true
+#   hostNamespaceOnly: true
+# ipv4:
+#   enabled: true
+# nodePort:
+#   enabled: true
+
+# monitor:
+#   # -- Enable the cilium-monitor sidecar.
+#   enabled: true
+
+# loadBalancer:
+#   nodePort:
+#     # -- Enable the Cilium NodePort service implementation.
+#     enabled: true

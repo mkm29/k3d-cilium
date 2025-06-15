@@ -1,0 +1,93 @@
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor directories and files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Kubernetes
+kubeconfig
+.kube/
+*.kubeconfig
+
+# Helm
+*.tgz
+charts/*.tgz
+requirements.lock
+
+# Sensitive data
+.env
+.env.local
+.env.*.local
+secrets/
+*.key
+*.pem
+*.crt
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+tmp/
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Cache directories
+.cache/
+__pycache__/
+*.pyc
+
+# Build artifacts
+dist/
+build/
+target/
+out/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# k3d specific
+k3d-registry.yaml
+.k3d/
+
+# Podman specific
+podman-compose.yml
+containers.conf
+
+# Testing
+coverage/
+.coverage
+*.cover
+.hypothesis/
+.pytest_cache/
