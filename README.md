@@ -110,103 +110,125 @@ Calico is a cloud-native networking and network security solution for containers
 
 ## Architecture
 
-### Calico Architecture Overview
+### Architecture Overview
+
+The Calico architecture consists of three main layers: the host infrastructure, the Kubernetes cluster topology, and the Calico networking components. Each diagram below focuses on a specific aspect for better clarity.
+
+#### 1. Host and Infrastructure Layer
 
 ```mermaid
 graph TB
     subgraph "macOS Host"
-        PM["Podman Machine<br/>Linux VM"]
         PC[Podman Client]
         K3D[k3d CLI]
         CTL["calicoctl<br/>CLI"]
     end
 
     subgraph "Podman Machine VM"
+        PM["Podman Machine<br/>Linux VM"]
         PD[Podman Daemon]
-
-        subgraph "k3d Cluster"
-            LB["Load Balancer<br/>k3d-calico-serverlb"]
-            
-            subgraph "Control Plane (Server Node)"
-                S1[k3d-calico-server-0]
-                API[kube-apiserver]
-                ETCD[etcd]
-                CM[controller-manager]
-                SCH[scheduler]
-            end
-            
-            subgraph "Worker Nodes"
-                A1[k3d-calico-agent-0]
-                A2[k3d-calico-agent-1]
-            end
-
-            subgraph "Calico System Components"
-                subgraph "tigera-operator namespace"
-                    TO[Tigera Operator]
-                end
-                
-                subgraph "calico-system namespace"
-                    CN1["calico-node<br/>DaemonSet"]
-                    CKC[calico-kube-controllers]
-                    TYP["calico-typha<br/>optional"]
-                end
-                
-                subgraph "calico-apiserver namespace"
-                    CAS[calico-apiserver]
-                end
-            end
-            
-            subgraph "Network Components"
-                IPAM[Calico IPAM]
-                BGP["BIRD BGP<br/>Daemon"]
-                FEL["Felix<br/>Policy Engine"]
-                CON["confd<br/>Config Daemon"]
-            end
-        end
-
         REG["Registry<br/>registry1.dso.mil"]
+    end
+
+    subgraph "k3d Cluster"
+        CLUSTER[Kubernetes Cluster]
     end
 
     PC --> PD
     K3D --> PD
-    CTL --> API
-    PD --> LB
+    CTL --> CLUSTER
+    PD --> CLUSTER
+    CLUSTER --> REG
+
+    style PC fill:#e8282b,stroke:#373737,stroke-width:2px,color:#fff
+    style K3D fill:#8162aa,stroke:#373737,stroke-width:2px,color:#fff
+    style CTL fill:#ff6b00,stroke:#373737,stroke-width:2px,color:#fff
+    style PM fill:#9bcb3c,stroke:#373737,stroke-width:2px,color:#fff
+    style PD fill:#e8282b,stroke:#373737,stroke-width:2px,color:#fff
+    style REG fill:#373737,stroke:#373737,stroke-width:2px,color:#fff
+    style CLUSTER fill:#007BFF,stroke:#373737,stroke-width:2px,color:#fff
+```
+
+#### 2. k3d Cluster Topology
+
+```mermaid
+graph TB
+    subgraph "k3d Cluster Network"
+        LB["Load Balancer<br/>k3d-calico-serverlb"]
+        
+        subgraph "Control Plane"
+            S1[k3d-calico-server-0]
+            API[kube-apiserver]
+            ETCD[etcd]
+            CM[controller-manager]
+            SCH[scheduler]
+        end
+        
+        subgraph "Worker Nodes"
+            A1[k3d-calico-agent-0]
+            A2[k3d-calico-agent-1]
+        end
+    end
+
     LB --> S1
     S1 -.-> A1
     S1 -.-> A2
-    
-    TO --> CN1
-    TO --> CKC
-    TO --> CAS
-    
-    CN1 --> FEL
-    CN1 --> BGP
-    CN1 --> CON
-    FEL --> IPAM
-    
     API --> ETCD
-    CKC --> API
-    CAS --> API
+    S1 --> API
+    S1 --> CM
+    S1 --> SCH
 
-    style PM fill:#9bcb3c,stroke:#373737,stroke-width:2px,color:#fff
-    style PD fill:#e8282b,stroke:#373737,stroke-width:2px,color:#fff
-    style K3D fill:#8162aa,stroke:#373737,stroke-width:2px,color:#fff
-    style CTL fill:#ff6b00,stroke:#373737,stroke-width:2px,color:#fff
-    style PC fill:#e8282b,stroke:#373737,stroke-width:2px,color:#fff
     style LB fill:#007BFF,stroke:#373737,stroke-width:2px,color:#fff
     style S1 fill:#373737,stroke:#373737,stroke-width:2px,color:#fff
     style A1 fill:#505050,stroke:#373737,stroke-width:2px,color:#fff
     style A2 fill:#505050,stroke:#373737,stroke-width:2px,color:#fff
+    style API fill:#4caf50,stroke:#373737,stroke-width:2px,color:#fff
+    style ETCD fill:#ff9800,stroke:#373737,stroke-width:2px,color:#fff
+    style CM fill:#2196f3,stroke:#373737,stroke-width:2px,color:#fff
+    style SCH fill:#9c27b0,stroke:#373737,stroke-width:2px,color:#fff
+```
+
+#### 3. Calico Components Architecture
+
+```mermaid
+graph TB
+    subgraph "Calico Management Layer"
+        TO[Tigera Operator]
+        CAS[calico-apiserver]
+        CKC[calico-kube-controllers]
+    end
+
+    subgraph "Node-Level Components"
+        CN1["calico-node<br/>DaemonSet"]
+        TYP["calico-typha<br/>optional"]
+    end
+
+    subgraph "Networking Engine"
+        FEL["Felix<br/>Policy Engine"]
+        BGP["BIRD BGP<br/>Daemon"]
+        CON["confd<br/>Config Daemon"]
+        IPAM[Calico IPAM]
+    end
+
+    TO --> CN1
+    TO --> CKC
+    TO --> CAS
+    CN1 --> FEL
+    CN1 --> BGP
+    CN1 --> CON
+    FEL --> IPAM
+    TYP --> CN1
+    CKC --> CAS
+
     style TO fill:#ff6b00,stroke:#373737,stroke-width:2px,color:#fff
-    style CN1 fill:#ff9800,stroke:#373737,stroke-width:2px,color:#fff
-    style CKC fill:#ff9800,stroke:#373737,stroke-width:2px,color:#fff
     style CAS fill:#ff9800,stroke:#373737,stroke-width:2px,color:#fff
+    style CKC fill:#ff9800,stroke:#373737,stroke-width:2px,color:#fff
+    style CN1 fill:#ff9800,stroke:#373737,stroke-width:2px,color:#fff
     style TYP fill:#ffc107,stroke:#373737,stroke-width:2px,color:#fff
     style FEL fill:#2196f3,stroke:#373737,stroke-width:2px,color:#fff
     style BGP fill:#4caf50,stroke:#373737,stroke-width:2px,color:#fff
     style CON fill:#9c27b0,stroke:#373737,stroke-width:2px,color:#fff
     style IPAM fill:#00bcd4,stroke:#373737,stroke-width:2px,color:#fff
-    style REG fill:#373737,stroke:#373737,stroke-width:2px,color:#fff
 ```
 
 ### Calico Component Details
