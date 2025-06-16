@@ -309,6 +309,33 @@ make create-cluster K3D_CONFIG=k3d-calico-config.yaml
 make install-calico
 ```
 
+**Note about Calico installation**: The installation process now:
+
+- Uses Calico v3.30.0
+- Uses `kubectl create` instead of `kubectl apply` for initial resource creation
+- Waits for all Tigera status conditions to be available
+- Automatically enables container IP forwarding by patching the installation with `containerIPForwarding: "Enabled"`
+- No longer requires waiting for individual deployments
+
+##### Enabling eBPF Dataplane (Optional)
+
+Calico supports an eBPF dataplane for improved performance and reduced CPU usage. To enable it:
+
+```bash
+# Enable eBPF dataplane (requires kernel 5.3+)
+make enable-calico-ebpf
+
+# To revert back to iptables dataplane
+make disable-calico-ebpf
+```
+
+**eBPF Requirements**:
+
+- Linux kernel v5.3+ (v5.8+ recommended)
+- x86-64 or arm64 architecture
+- Cannot mix eBPF and standard dataplane nodes
+- VXLAN is used instead of IPIP for tunneling
+
 #### Custom Configuration
 
 You can use any k3d configuration file:
@@ -320,7 +347,7 @@ make create-cluster CLUSTER_NAME=my-cluster K3D_CONFIG=my-custom-config.yaml
 
 ### Step 5: Verification
 
-#### For Cilium:
+#### For Cilium
 
 ```bash
 # Check Cilium status
@@ -339,7 +366,7 @@ kubectl get nodes
 kubectl get pods -n kube-system | grep cilium
 ```
 
-#### For Calico:
+#### For Calico
 
 ```bash
 # Check Calico pods
@@ -397,10 +424,12 @@ calicoctl version
 | `install-cilium` | Install Cilium CNI | patch-nodes | - |
 | `uninstall-cilium` | Remove Cilium | - | - |
 | `install-calico` | Install Calico CNI | create-cluster | - |
+| `enable-calico-ebpf` | Enable eBPF dataplane for Calico | install-calico | - |
+| `disable-calico-ebpf` | Disable eBPF dataplane (revert to iptables) | - | - |
 | `uninstall-calico` | Remove Calico | - | - |
 | `delete-cluster` | Delete k3d cluster | - | `CLUSTER_NAME` |
-| `create-calico-cluster` | Create Calico cluster | preflight | `CALICO_CLUSTER_NAME` |
-| `delete-calico-cluster` | Delete Calico cluster | - | `CALICO_CLUSTER_NAME` |
+| `create-calico-cluster` | Create Calico cluster | preflight | `CLUSTER_NAME` |
+| `delete-calico-cluster` | Delete Calico cluster | - | `CLUSTER_NAME` |
 
 ### k3d Configuration
 
@@ -444,7 +473,7 @@ registries:
         password: <password>
 ```
 
-#### Calico Configuration (`calico-k3d-config.yaml`)
+#### Calico Configuration (`k3d-calico-config.yaml`)
 
 ```yaml
 apiVersion: k3d.io/v1alpha5
@@ -459,9 +488,9 @@ ports:
   - port: 8080:80               # Expose port 80 as 8080
     nodeFilters:
       - loadbalancer
-  - port: 6443:6443             # API server port
-    nodeFilters:
-      - loadbalancer
+  # - port: 6443:6443           # API server port (commented out)
+  #   nodeFilters:
+  #     - loadbalancer
 options:
   k3s:
     extraArgs:
@@ -472,13 +501,13 @@ options:
       - arg: --disable-network-policy
         nodeFilters:
           - server:*
-      # Calico specific settings
-      - arg: --cluster-cidr=192.168.0.0/16
-        nodeFilters:
-          - server:*
-      - arg: --service-cidr=10.96.0.0/12
-        nodeFilters:
-          - server:*
+      # Calico specific settings (commented out since subnet is specified at k3d level)
+      # - arg: --cluster-cidr="172.28.0.0/16"
+      #   nodeFilters:
+      #     - server:*
+      # - arg: --service-cidr=10.96.0.0/12
+      #   nodeFilters:
+      #     - server:*
       - arg: --disable=traefik
         nodeFilters:
           - server:*
@@ -546,13 +575,16 @@ The default Calico installation provides:
 - **IPAM**: Calico's IP Address Management
 - **Network Policy**: Full Kubernetes NetworkPolicy support plus Calico-specific policies
 - **Data Store**: Kubernetes API server (no etcd required)
-- **Default CIDR**: 192.168.0.0/16 for pod networking
-- **Service CIDR**: 10.96.0.0/12 for Kubernetes services
+- **Pod Network CIDR**: Uses k3d's subnet configuration (172.28.0.0/16)
+- **Service CIDR**: Default Kubernetes service CIDR (10.96.0.0/12)
+- **Container IP Forwarding**: Enabled by default for proper pod-to-pod communication
 - **BGP**: Optional BGP routing for advanced networking scenarios
 - **Multiple Dataplane Options**:
   - **Standard (iptables)**: Default Linux dataplane using iptables/ipsets
   - **eBPF**: High-performance dataplane using eBPF programs
   - **VPP**: Vector Packet Processing for extreme performance (experimental)
+
+**Note**: The cluster CIDR and service CIDR are no longer explicitly set in the k3s arguments since we're using k3d's `subnet` configuration at the cluster level. This ensures consistency across the cluster configuration.
 
 ## Troubleshooting
 
@@ -947,26 +979,35 @@ kubectl patch felixconfiguration default --type='merge' -p '{
 
 #### Switching Calico Dataplane Modes
 
-Switch between different Calico dataplane modes:
+You can switch between different Calico dataplane modes using the Makefile targets:
+
+```bash
+# Enable eBPF dataplane (recommended approach)
+make enable-calico-ebpf
+
+# Disable eBPF and revert to iptables
+make disable-calico-ebpf
+```
+
+Or manually using kubectl:
 
 ```bash
 # Switch to eBPF dataplane (requires kernel 5.3+)
-kubectl patch felixconfiguration default --type='merge' -p '{"spec":{"bpfEnabled":true}}'
+kubectl patch installation.operator.tigera.io default --type merge -p '{"spec":{"calicoNetwork":{"linuxDataplane":"BPF"}}}'
 
 # Verify eBPF mode is active
 kubectl logs -n calico-system -l k8s-app=calico-node | grep -i "BPF dataplane is in use"
 
 # Switch back to standard iptables dataplane
-kubectl patch felixconfiguration default --type='merge' -p '{"spec":{"bpfEnabled":false}}'
+kubectl patch installation.operator.tigera.io default --type merge -p '{"spec":{"calicoNetwork":{"linuxDataplane":"Iptables"}}}'
 
-# Configure eBPF with specific settings
+# Configure eBPF with specific settings via FelixConfiguration
 cat <<EOF | kubectl apply -f -
 apiVersion: projectcalico.org/v3
 kind: FelixConfiguration
 metadata:
   name: default
 spec:
-  bpfEnabled: true
   bpfKubeProxyIptablesCleanupEnabled: true
   bpfKubeProxyMinSyncPeriod: 1s
   bpfExtToServiceConnmark: 0x80000000
@@ -974,6 +1015,8 @@ spec:
   bpfLogLevel: "Info"
 EOF
 ```
+
+**Note**: When using the operator installation method (which we use), the eBPF mode is controlled via the Installation resource, not the FelixConfiguration.
 
 ### Calico-Specific Advanced Features
 

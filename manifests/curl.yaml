@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: curl
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: k3d-calico-agent-1
+  containers:
+  - args:
+    - sleep
+    - "3600"
+    image: curlimages/curl:latest
+    name: curl
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always

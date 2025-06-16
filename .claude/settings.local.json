@@ -3,7 +3,8 @@
     "allow": [
       "Bash(grep:*)",
       "Bash(rm:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "WebFetch(domain:docs.tigera.io)"
     ],
     "deny": []
   }
