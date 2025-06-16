@@ -201,7 +201,7 @@ graph TB
     style CN1 fill:#ff9800,stroke:#373737,stroke-width:2px,color:#fff
     style CKC fill:#ff9800,stroke:#373737,stroke-width:2px,color:#fff
     style CAS fill:#ff9800,stroke:#373737,stroke-width:2px,color:#fff
-    style TYP fill:#ffc107,stroke:#373737,stroke-width:2px,color:#333
+    style TYP fill:#ffc107,stroke:#373737,stroke-width:2px,color:#fff
     style FEL fill:#2196f3,stroke:#373737,stroke-width:2px,color:#fff
     style BGP fill:#4caf50,stroke:#373737,stroke-width:2px,color:#fff
     style CON fill:#9c27b0,stroke:#373737,stroke-width:2px,color:#fff
