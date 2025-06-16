@@ -1,10 +1,10 @@
 # Setup some variables
-CLUSTER_NAME ?= cilium
-K3D_CONFIG ?= k3d-cilium-config.yaml
+CLUSTER_NAME ?= calico
+K3D_CONFIG ?= infrastructure/k3d/calico-config.yaml
 
 # HELP
 # This will output the help for each task
-.PHONY: help build test install-go-test-coverage check-coverage
+.PHONY: help preflight create-cluster create-calico-cluster patch-nodes install-prometheus-crds install-gateway-api install-cilium uninstall-cilium install-calico uninstall-calico enable-calico-ebpf disable-calico-ebpf delete-cluster delete-calico-cluster
 
 # Tasks
 help: ## This help.
@@ -44,12 +44,6 @@ preflight: ## Run preflight checks
 create-cluster: preflight ## Create a k3d cluster (use K3D_CONFIG to specify config file)
 	@echo "Creating k3d cluster with config: $(K3D_CONFIG)..."
 	@k3d cluster create $(CLUSTER_NAME) --config $(K3D_CONFIG)
-	@echo "Cluster $(CLUSTER_NAME) created successfully."
-
-.PHONY: create-calico-cluster
-create-calico-cluster: preflight ## Create a k3d cluster with Calico
-	@echo "Creating k3d cluster with Calico..."
-	@k3d cluster create $(CLUSTER_NAME) --config k3d-calico-config.yaml
 	@echo "Cluster $(CLUSTER_NAME) created successfully."
 
 .PHONY: patch-nodes
@@ -95,7 +89,7 @@ install-gateway-api: ## Install Gateway API CRDs
 .PHONY: install-cilium
 install-cilium: ## Install Cilium on the k3d cluster
 	@echo "Installing Cilium on the k3d cluster..."
-	@cilium install -f cilium-values.yaml --wait
+	@cilium install -f infrastructure/cilium/values.yaml --wait
 	@echo "Cilium installed successfully."
 
 .PHONY: uninstall-cilium
