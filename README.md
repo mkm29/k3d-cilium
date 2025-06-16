@@ -115,17 +115,17 @@ Calico is a cloud-native networking and network security solution for containers
 ```mermaid
 graph TB
     subgraph "macOS Host"
-        PM[Podman Machine<br/>Linux VM]
+        PM["Podman Machine<br/>Linux VM"]
         PC[Podman Client]
         K3D[k3d CLI]
-        CTL[calicoctl<br/>CLI]
+        CTL["calicoctl<br/>CLI"]
     end
 
     subgraph "Podman Machine VM"
         PD[Podman Daemon]
 
         subgraph "k3d Cluster"
-            LB[Load Balancer<br/>k3d-calico-serverlb]
+            LB["Load Balancer<br/>k3d-calico-serverlb"]
             
             subgraph "Control Plane (Server Node)"
                 S1[k3d-calico-server-0]
@@ -146,9 +146,9 @@ graph TB
                 end
                 
                 subgraph "calico-system namespace"
-                    CN1[calico-node<br/>DaemonSet]
+                    CN1["calico-node<br/>DaemonSet"]
                     CKC[calico-kube-controllers]
-                    TYP[calico-typha<br/>(optional)]
+                    TYP["calico-typha<br/>optional"]
                 end
                 
                 subgraph "calico-apiserver namespace"
@@ -158,13 +158,13 @@ graph TB
             
             subgraph "Network Components"
                 IPAM[Calico IPAM]
-                BGP[BIRD BGP<br/>Daemon]
-                FEL[Felix<br/>Policy Engine]
-                CON[confd<br/>Config Daemon]
+                BGP["BIRD BGP<br/>Daemon"]
+                FEL["Felix<br/>Policy Engine"]
+                CON["confd<br/>Config Daemon"]
             end
         end
 
-        REG[Registry<br/>registry1.dso.mil]
+        REG["Registry<br/>registry1.dso.mil"]
     end
 
     PC --> PD
@@ -217,7 +217,7 @@ graph LR
         FX[Felix]
         BD[BIRD]
         CF[confd]
-        CN[calico-node<br/>container]
+        CN["calico-node<br/>container"]
         
         FX --> |Programs| IPT[iptables/eBPF]
         FX --> |Routes| RT[Routing Table]

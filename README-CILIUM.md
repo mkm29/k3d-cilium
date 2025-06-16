@@ -13,7 +13,7 @@ This document covers the Cilium-specific configuration and setup for k3d cluster
 ```mermaid
 graph TB
     subgraph "macOS Host"
-        PM[Podman Machine<br/>Linux VM]
+        PM["Podman Machine<br/>Linux VM"]
         PC[Podman Client]
         K3D[k3d CLI]
     end
@@ -36,7 +36,7 @@ graph TB
             end
         end
 
-        REG[Registry<br/>registry1.dso.mil]
+        REG["Registry<br/>registry1.dso.mil"]
     end
 
     PC --> PD
