@@ -1,6 +1,8 @@
-# k3d with Podman and eBPF-based CNIs (Cilium/Calico)
+# k3d with Podman and Calico CNI
 
-A comprehensive guide for running k3d (Kubernetes in Docker) clusters using Podman as the container runtime with eBPF-based CNI solutions (Cilium or Calico) for advanced networking, security, and observability features.
+A comprehensive guide for running k3d (Kubernetes in Docker) clusters using Podman as the container runtime with Calico CNI for advanced networking, security, and network policy management.
+
+> **Note**: For Cilium CNI setup, please refer to [README-CILIUM.md](README-CILIUM.md)
 
 ## Table of Contents
 
@@ -19,27 +21,31 @@ A comprehensive guide for running k3d (Kubernetes in Docker) clusters using Podm
 This project demonstrates how to run k3d clusters with:
 
 - **Podman** as the container runtime (instead of Docker)
-- **eBPF-based CNIs** - Choose between Cilium or Calico for advanced networking
-- **Cilium** features: Hubble observability, WireGuard encryption, SPIRE mTLS
-- **Calico** features: Network policies, BGP support, flexible IPAM
-- **Production-ready** configurations for both CNI options
+- **Calico CNI** for advanced networking with optional eBPF dataplane
+- **Network Policies**: Full Kubernetes NetworkPolicy support plus Calico-specific policies
+- **BGP Support**: Advanced routing capabilities for on-premise and hybrid cloud
+- **Flexible IPAM**: Multiple IP pools and advanced IP management
+- **Multiple Dataplanes**: Choose between standard (iptables) or high-performance eBPF
+- **Production-ready** configuration with enterprise features
 
-## CNI Options
+## Calico CNI
 
-| **[Cilium](https://cilium.io/)** | **[Calico](https://www.tigera.io/project-calico/)** |
-|----------------------------------|-----------------------------------------------------|
-| ![Cilium Logo](https://cdn.jsdelivr.net/gh/cilium/cilium@main/Documentation/images/logo-dark.svg) | ![Calico Logo](https://www.tigera.io/app/uploads/2025/05/Calico_logo_white.svg) |
-| eBPF-native networking, observability, and security | Cloud-native networking and network security |
+<p align="center">
+  <img src="https://www.tigera.io/app/uploads/2025/05/Calico_logo_white.svg" alt="Calico Logo" width="400"/>
+</p>
+
+Calico is a cloud-native networking and network security solution for containers, virtual machines, and native host-based workloads. It supports multiple data planes including Linux eBPF, standard iptables, and VPP.
 
 ### Key Features
 
 - 🚀 Lightweight Kubernetes development environment
-- 🔄 Choice of CNI: Cilium or Calico (both eBPF-based)
-- 🔒 Enhanced security with encryption and network policies
-- 🔍 Full observability (Hubble UI for Cilium)
-- 🌐 Advanced networking with eBPF-based dataplane
+- 🐅 Calico CNI with flexible dataplane options (iptables or eBPF)
+- 🔒 Enhanced security with fine-grained network policies
+- 🌐 BGP support for advanced routing scenarios
+- 🎯 Multiple IP pools for workload isolation
+- 📊 Prometheus metrics and observability
 - 📦 Registry integration for private images
-- 🎯 Production-like development environment
+- 🔧 Production-like development environment
 
 ## Prerequisites
 
@@ -52,7 +58,6 @@ This project demonstrates how to run k3d clusters with:
 | k3s | v1.31.5+ | Lightweight Kubernetes |
 | kubectl | Latest | Kubernetes CLI |
 | Helm | 3.x | Package management |
-| Cilium CLI | Latest | Cilium management |
 | calicoctl | v3.30.3+ | Calico management (optional) |
 
 ### System Requirements
@@ -105,29 +110,57 @@ This project demonstrates how to run k3d clusters with:
 
 ## Architecture
 
+### Calico Architecture Overview
+
 ```mermaid
 graph TB
     subgraph "macOS Host"
         PM[Podman Machine<br/>Linux VM]
         PC[Podman Client]
         K3D[k3d CLI]
+        CTL[calicoctl<br/>CLI]
     end
 
     subgraph "Podman Machine VM"
         PD[Podman Daemon]
 
         subgraph "k3d Cluster"
-            LB[Load Balancer]
-            S1[Server Node]
-            A1[Agent Node 1]
-            A2[Agent Node 2]
+            LB[Load Balancer<br/>k3d-calico-serverlb]
+            
+            subgraph "Control Plane (Server Node)"
+                S1[k3d-calico-server-0]
+                API[kube-apiserver]
+                ETCD[etcd]
+                CM[controller-manager]
+                SCH[scheduler]
+            end
+            
+            subgraph "Worker Nodes"
+                A1[k3d-calico-agent-0]
+                A2[k3d-calico-agent-1]
+            end
 
-            subgraph "Cilium Components"
-                CA[Cilium Agent]
-                CO[Cilium Operator]
-                HU[Hubble UI]
-                HR[Hubble Relay]
-                SP[SPIRE]
+            subgraph "Calico System Components"
+                subgraph "tigera-operator namespace"
+                    TO[Tigera Operator]
+                end
+                
+                subgraph "calico-system namespace"
+                    CN1[calico-node<br/>DaemonSet]
+                    CKC[calico-kube-controllers]
+                    TYP[calico-typha<br/>(optional)]
+                end
+                
+                subgraph "calico-apiserver namespace"
+                    CAS[calico-apiserver]
+                end
+            end
+            
+            subgraph "Network Components"
+                IPAM[Calico IPAM]
+                BGP[BIRD BGP<br/>Daemon]
+                FEL[Felix<br/>Policy Engine]
+                CON[confd<br/>Config Daemon]
             end
         end
 
@@ -136,35 +169,88 @@ graph TB
 
     PC --> PD
     K3D --> PD
+    CTL --> API
     PD --> LB
     LB --> S1
-    S1 --> A1
-    S1 --> A2
-    CA --> S1
-    CA --> A1
-    CA --> A2
+    S1 -.-> A1
+    S1 -.-> A2
+    
+    TO --> CN1
+    TO --> CKC
+    TO --> CAS
+    
+    CN1 --> FEL
+    CN1 --> BGP
+    CN1 --> CON
+    FEL --> IPAM
+    
+    API --> ETCD
+    CKC --> API
+    CAS --> API
 
-    style PM fill:#9bcb3c,stroke:#373737,stroke-width:2px,color:#333
-    style PD fill:#e8282b,stroke:#373737,stroke-width:2px,color:#333
-    style K3D fill:#8162aa,stroke:#373737,stroke-width:2px,color:#FFF
-    style PC fill:#e8282b,stroke:#373737,stroke-width:2px,color:#333
-    style LB fill:#007BFF,stroke:#373737,stroke-width:2px,color:#333
-    style S1 fill:#373737,stroke:#373737,stroke-width:2px,color:#FFF
-    style A1 fill:#FFFFFF,stroke:#373737,stroke-width:2px,color:#333
-    style A2 fill:#FFFFFF,stroke:#373737,stroke-width:2px,color:#333
-    style CA fill:#f07525,stroke:#373737,stroke-width:2px,color:#333
-    style CO fill:#f8c519,stroke:#373737,stroke-width:2px,color:#333
-    style HU fill:#6389c6,stroke:#373737,stroke-width:2px,color:#333
-    style HR fill:#e8282b,stroke:#373737,stroke-width:2px,color:#333
-    style SP fill:#8162aa,stroke:#373737,stroke-width:2px,color:#333
-    style REG fill:#373737,stroke:#373737,stroke-width:2px,color:#333
+    style PM fill:#9bcb3c,stroke:#373737,stroke-width:2px,color:#fff
+    style PD fill:#e8282b,stroke:#373737,stroke-width:2px,color:#fff
+    style K3D fill:#8162aa,stroke:#373737,stroke-width:2px,color:#fff
+    style CTL fill:#ff6b00,stroke:#373737,stroke-width:2px,color:#fff
+    style PC fill:#e8282b,stroke:#373737,stroke-width:2px,color:#fff
+    style LB fill:#007BFF,stroke:#373737,stroke-width:2px,color:#fff
+    style S1 fill:#373737,stroke:#373737,stroke-width:2px,color:#fff
+    style A1 fill:#505050,stroke:#373737,stroke-width:2px,color:#fff
+    style A2 fill:#505050,stroke:#373737,stroke-width:2px,color:#fff
+    style TO fill:#ff6b00,stroke:#373737,stroke-width:2px,color:#fff
+    style CN1 fill:#ff9800,stroke:#373737,stroke-width:2px,color:#fff
+    style CKC fill:#ff9800,stroke:#373737,stroke-width:2px,color:#fff
+    style CAS fill:#ff9800,stroke:#373737,stroke-width:2px,color:#fff
+    style TYP fill:#ffc107,stroke:#373737,stroke-width:2px,color:#333
+    style FEL fill:#2196f3,stroke:#373737,stroke-width:2px,color:#fff
+    style BGP fill:#4caf50,stroke:#373737,stroke-width:2px,color:#fff
+    style CON fill:#9c27b0,stroke:#373737,stroke-width:2px,color:#fff
+    style IPAM fill:#00bcd4,stroke:#373737,stroke-width:2px,color:#fff
+    style REG fill:#373737,stroke:#373737,stroke-width:2px,color:#fff
+```
+
+### Calico Component Details
+
+```mermaid
+graph LR
+    subgraph "Calico Node Components (per node)"
+        FX[Felix]
+        BD[BIRD]
+        CF[confd]
+        CN[calico-node<br/>container]
+        
+        FX --> |Programs| IPT[iptables/eBPF]
+        FX --> |Routes| RT[Routing Table]
+        BD --> |BGP| PEER[BGP Peers]
+        CF --> |Watches| DS[Datastore]
+    end
+    
+    subgraph "Control Plane Components"
+        KC[kube-controllers]
+        OP[Tigera Operator]
+        AS[API Server Extension]
+    end
+    
+    subgraph "Data Flow"
+        POD[Pod] --> |Traffic| IPT
+        IPT --> |Forward| RT
+        RT --> |Route| PEER
+    end
+    
+    style FX fill:#2196f3,color:#fff
+    style BD fill:#4caf50,color:#fff
+    style CF fill:#9c27b0,color:#fff
+    style CN fill:#ff9800,color:#fff
+    style KC fill:#ff6b00,color:#fff
+    style OP fill:#ff6b00,color:#fff
+    style AS fill:#ff9800,color:#fff
 ```
 
 ## Quick Start
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/mkm29/k3d-cilium
+git clone https://github.com/mkm29/k3d-podman
 cd k3d-podman
 
 # 2. Initialize Podman machine (macOS only)
@@ -177,21 +263,16 @@ Host localhost 127.0.0.1
     StrictHostKeyChecking no
 EOF
 
-# 4a. Create cluster with Cilium (default)
+# 4. Create cluster with Calico (default)
 make create-cluster
-make patch-nodes
-make install-prometheus-crds
-make install-cilium
-
-# 4b. OR create cluster with Calico
-make create-cluster K3D_CONFIG=k3d-calico-config.yaml
 make install-calico
 
 # 5. Verify installation
-# For Cilium:
-cilium status --wait
-# For Calico:
 kubectl get pods -n calico-system
+kubectl get pods -n tigera-operator
+
+# 6. (Optional) Enable eBPF dataplane
+make enable-calico-ebpf
 ```
 
 ## Detailed Setup Guide
@@ -271,39 +352,14 @@ Host 127.0.0.1
 
 ### Step 4: Cluster Creation
 
-#### Option A: Cilium CNI
-
 Using the Makefile:
 
 ```bash
 # Run preflight checks
 make preflight
 
-# Create cluster with Cilium config (default)
+# Create cluster with Calico config (default)
 make create-cluster
-# OR explicitly specify config
-make create-cluster K3D_CONFIG=k3d-cilium-config.yaml
-
-# Patch nodes for BPF/cgroup support
-make patch-nodes
-
-# Install Prometheus CRDs (for ServiceMonitor support)
-make install-prometheus-crds
-
-# Install Cilium
-make install-cilium
-```
-
-#### Option B: Calico CNI
-
-Using the Makefile:
-
-```bash
-# Run preflight checks
-make preflight
-
-# Create cluster with Calico config
-make create-cluster K3D_CONFIG=k3d-calico-config.yaml
 
 # Install Calico
 make install-calico
@@ -346,27 +402,6 @@ make create-cluster CLUSTER_NAME=my-cluster K3D_CONFIG=my-custom-config.yaml
 ```
 
 ### Step 5: Verification
-
-#### For Cilium
-
-```bash
-# Check Cilium status
-cilium status --wait
-
-# Run connectivity tests
-cilium connectivity test
-
-# Access Hubble UI
-cilium hubble ui
-
-# Check cluster nodes
-kubectl get nodes
-
-# Verify Cilium pods
-kubectl get pods -n kube-system | grep cilium
-```
-
-#### For Calico
 
 ```bash
 # Check Calico pods
@@ -418,60 +453,15 @@ calicoctl version
 | `help` | Show available commands | - | - |
 | `preflight` | Check required tools | - | - |
 | `create-cluster` | Create k3d cluster | preflight | `K3D_CONFIG`, `CLUSTER_NAME` |
-| `patch-nodes` | Configure BPF mounts (Cilium) | create-cluster | - |
 | `install-prometheus-crds` | Install Prometheus CRDs | - | - |
 | `install-gateway-api` | Install Gateway API CRDs | - | - |
-| `install-cilium` | Install Cilium CNI | patch-nodes | - |
-| `uninstall-cilium` | Remove Cilium | - | - |
 | `install-calico` | Install Calico CNI | create-cluster | - |
 | `enable-calico-ebpf` | Enable eBPF dataplane for Calico | install-calico | - |
 | `disable-calico-ebpf` | Disable eBPF dataplane (revert to iptables) | - | - |
 | `uninstall-calico` | Remove Calico | - | - |
 | `delete-cluster` | Delete k3d cluster | - | `CLUSTER_NAME` |
-| `create-calico-cluster` | Create Calico cluster | preflight | `CLUSTER_NAME` |
-| `delete-calico-cluster` | Delete Calico cluster | - | `CLUSTER_NAME` |
 
 ### k3d Configuration
-
-#### Cilium Configuration (`k3d-cilium-config.yaml`)
-
-```yaml
-apiVersion: k3d.io/v1alpha5
-kind: Simple
-metadata:
-  name: uds
-servers: 1                      # Control plane nodes
-agents: 2                       # Worker nodes
-image: rancher/k3s:v1.33.1-k3s1 # k3s version
-subnet: "172.28.0.0/16"         # Cluster subnet
-ports:
-  - port: 8080:80               # Expose port 80 as 8080
-    nodeFilters:
-      - loadbalancer
-options:
-  k3s:
-    extraArgs:
-      # Disable default CNI for Cilium
-      - arg: --disable-network-policy
-        nodeFilters:
-          - server:*
-      - arg: --flannel-backend=none
-        nodeFilters:
-          - server:*
-      - arg: --disable=traefik
-        nodeFilters:
-          - server:*
-registries:
-  mirrors:
-    registry1.dso.mil:
-      endpoint:
-        - http://registry1.dso.mil
-  configs:
-    registry1.dso.mil:
-      auth:
-        username: <username>
-        password: <password>
-```
 
 #### Calico Configuration (`k3d-calico-config.yaml`)
 
@@ -483,7 +473,7 @@ metadata:
 servers: 1                      # Control plane nodes
 agents: 2                       # Worker nodes
 image: rancher/k3s:v1.33.1-k3s1 # k3s version
-subnet: "172.28.0.0/16"         # Cluster subnet
+subnet: "192.168.0.0/16"         # Cluster subnet
 ports:
   - port: 8080:80               # Expose port 80 as 8080
     nodeFilters:
@@ -502,7 +492,7 @@ options:
         nodeFilters:
           - server:*
       # Calico specific settings (commented out since subnet is specified at k3d level)
-      # - arg: --cluster-cidr="172.28.0.0/16"
+      # - arg: --cluster-cidr="192.168.0.0/16"
       #   nodeFilters:
       #     - server:*
       # - arg: --service-cidr=10.96.0.0/12
@@ -513,61 +503,6 @@ options:
           - server:*
 ```
 
-### Cilium Values (`cilium-values.yml`)
-
-```yaml
-# BPF Configuration
-bpf:
-  masquerade: true              # Enable BPF masquerading
-
-# Cluster Identity
-cluster:
-  name: k3d-uds
-  id: 99                        # Unique cluster ID
-
-# Networking
-kubeProxyReplacement: true      # Replace kube-proxy with eBPF
-
-# Observability
-hubble:
-  enabled: true
-  metrics:
-    enabled:
-      - dns:query;ignoreAAAA
-      - drop
-      - tcp
-      - flow
-      - icmp
-      - http
-    dashboards:
-      enabled: true
-    serviceMonitor:
-      enabled: true  # Requires Prometheus CRDs
-  relay:
-    enabled: true
-  ui:
-    enabled: true
-
-# Ingress
-ingressController:
-  enabled: true
-  default: true
-
-# Security
-authentication:
-  mutual:
-    spire:
-      enabled: true
-      install:
-        enabled: true
-
-# Encryption
-encryption:
-  enabled: true
-  type: wireguard
-  nodeEncryption: true
-```
-
 ### Calico Configuration
 
 The default Calico installation provides:
@@ -575,7 +510,7 @@ The default Calico installation provides:
 - **IPAM**: Calico's IP Address Management
 - **Network Policy**: Full Kubernetes NetworkPolicy support plus Calico-specific policies
 - **Data Store**: Kubernetes API server (no etcd required)
-- **Pod Network CIDR**: Uses k3d's subnet configuration (172.28.0.0/16)
+- **Pod Network CIDR**: Uses k3d's subnet configuration (192.168.0.0/16)
 - **Service CIDR**: Default Kubernetes service CIDR (10.96.0.0/12)
 - **Container IP Forwarding**: Enabled by default for proper pod-to-pod communication
 - **BGP**: Optional BGP routing for advanced networking scenarios
@@ -613,51 +548,7 @@ echo $DOCKER_SOCKET
 docker version
 ```
 
-#### 2. BPF Mount Failures
-
-**Problem**: BPF filesystem not mounting
-
-```bash
-Error: failed to mount BPF filesystem
-```
-
-**Solution**:
-
-```bash
-# Verify mounts on nodes
-for node in $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}'); do
-    echo "=== Node: $node ==="
-    docker exec $node mount | grep bpf
-    docker exec $node mount | grep cgroup
-done
-
-# Remount if needed
-make patch-nodes
-```
-
-#### 3. Cilium Installation Failures
-
-**Problem**: Cilium pods not starting
-
-```bash
-cilium-agent CrashLoopBackOff
-```
-
-**Solution**:
-
-```bash
-# Check logs
-kubectl logs -n kube-system -l app.kubernetes.io/name=cilium-agent
-
-# Verify kernel requirements
-kubectl exec -n kube-system ds/cilium -- cilium-health status
-
-# Reinstall with debug
-cilium uninstall
-cilium install -f cilium-values.yml --debug
-```
-
-#### 4. DNS Resolution Issues
+#### 2. DNS Resolution Issues
 
 **Problem**: Pods cannot resolve DNS
 
@@ -681,7 +572,7 @@ kubectl get endpoints -n kube-system kube-dns
 kubectl run test-dns --image=busybox:1.28 --rm -it -- nslookup kubernetes.default
 ```
 
-#### 5. Calico-Specific Issues
+#### 3. Calico-Specific Issues
 
 **Problem**: Calico pods stuck in Init or CrashLoopBackOff
 
@@ -768,19 +659,6 @@ kubectl cluster-info
 kubectl get nodes -o wide
 kubectl describe nodes
 
-# Cilium status
-cilium status
-cilium config view
-kubectl -n kube-system exec ds/cilium -- cilium monitor
-
-# Hubble status
-hubble status
-hubble observe
-
-# Cilium network policies
-kubectl get cnp -A
-kubectl get ccnp
-
 # Calico status
 kubectl get pods -n calico-system
 kubectl get pods -n tigera-operator
@@ -815,27 +693,6 @@ kubectl logs -n tigera-operator deployment/tigera-operator --tail=100
 ## Advanced Topics
 
 ### Custom Network Policies
-
-#### Cilium Network Policy
-
-```yaml
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: allow-frontend-to-backend
-spec:
-  endpointSelector:
-    matchLabels:
-      app: backend
-  ingress:
-    - fromEndpoints:
-        - matchLabels:
-            app: frontend
-      toPorts:
-        - ports:
-            - port: "8080"
-              protocol: TCP
-```
 
 #### Calico Network Policy
 
@@ -888,34 +745,10 @@ spec:
 #### Gateway API Support
 
 ```bash
-cilium install --set gatewayAPI.enabled=true
-```
-
-#### Service Mesh (Beta)
-
-```bash
-cilium install --set serviceProxy.enabled=true
-```
-
-#### BGP Control Plane
-
-```bash
-cilium install --set bgpControlPlane.enabled=true
+make install-gateway-api
 ```
 
 ### Performance Tuning
-
-#### Cilium Performance Settings
-
-```yaml
-# High-performance settings
-cilium:
-  config:
-    bpf-map-dynamic-size-ratio: "0.005"
-    bpf-policy-map-max: "65536"
-    bpf-lb-map-max: "65536"
-    preallocate-bpf-maps: "true"
-```
 
 #### Calico Performance Tuning
 
@@ -1222,15 +1055,7 @@ curl http://localhost:9091/metrics | grep felix
 
 ### Multi-cluster Setup
 
-```bash
-# Create additional clusters
-k3d cluster create cluster2 --config k3d-cluster2.yaml
-
-# Install Cilium Cluster Mesh
-cilium clustermesh enable --context k3d-cilium
-cilium clustermesh enable --context k3d-cluster2
-cilium clustermesh connect --context k3d-cilium --destination-context k3d-cluster2
-```
+For multi-cluster setups with Calico, refer to the [Calico Multi-cluster documentation](https://docs.tigera.io/calico/latest/multicluster/), which supports federation across multiple Kubernetes clusters.
 
 ## Resources
 
@@ -1240,16 +1065,15 @@ cilium clustermesh connect --context k3d-cilium --destination-context k3d-cluste
 - [k3s Documentation](https://docs.k3s.io/)
 - [Podman Documentation](https://docs.podman.io/)
 
-### CNI Documentation
+### Calico Documentation
 
-- [Cilium Official Site](https://cilium.io/)
-- [Cilium Documentation](https://docs.cilium.io/en/stable/)
-- [Hubble Documentation](https://docs.cilium.io/en/stable/gettingstarted/hubble/)
 - [Calico Official Site](https://www.tigera.io/project-calico/)
 - [Calico Documentation](https://docs.tigera.io/calico/latest/about/)
 - [Calico Network Policies](https://docs.tigera.io/calico/latest/network-policy/)
 - [Calico BGP Documentation](https://docs.tigera.io/calico/latest/networking/bgp/)
 - [Calico IP Pool Management](https://docs.tigera.io/calico/latest/networking/ipam/)
+- [Calico eBPF Dataplane](https://docs.tigera.io/calico/latest/operations/ebpf/)
+- [Calico Installation Guide](https://docs.tigera.io/calico/latest/getting-started/kubernetes/)
 
 ### eBPF Resources
 

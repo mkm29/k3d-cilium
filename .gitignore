@@ -91,3 +91,4 @@ coverage/
 *.cover
 .hypothesis/
 .pytest_cache/
+.claude
