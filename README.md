@@ -495,7 +495,7 @@ metadata:
 servers: 1                      # Control plane nodes
 agents: 2                       # Worker nodes
 image: rancher/k3s:v1.33.1-k3s1 # k3s version
-subnet: "192.168.0.0/16"         # Cluster subnet
+subnet: "172.28.0.0/16"         # Cluster subnet
 ports:
   - port: 8080:80               # Expose port 80 as 8080
     nodeFilters:
@@ -514,7 +514,7 @@ options:
         nodeFilters:
           - server:*
       # Calico specific settings (commented out since subnet is specified at k3d level)
-      # - arg: --cluster-cidr="192.168.0.0/16"
+      # - arg: --cluster-cidr="172.28.0.0/16"
       #   nodeFilters:
       #     - server:*
       # - arg: --service-cidr=10.96.0.0/12
@@ -532,7 +532,7 @@ The default Calico installation provides:
 - **IPAM**: Calico's IP Address Management
 - **Network Policy**: Full Kubernetes NetworkPolicy support plus Calico-specific policies
 - **Data Store**: Kubernetes API server (no etcd required)
-- **Pod Network CIDR**: Uses k3d's subnet configuration (192.168.0.0/16)
+- **Pod Network CIDR**: Uses k3d's subnet configuration (172.28.0.0/16)
 - **Service CIDR**: Default Kubernetes service CIDR (10.96.0.0/12)
 - **Container IP Forwarding**: Enabled by default for proper pod-to-pod communication
 - **BGP**: Optional BGP routing for advanced networking scenarios
@@ -758,7 +758,7 @@ spec:
       nets:
       - 10.0.0.0/8
       - 172.16.0.0/12
-      - 192.168.0.0/16
+      - 172.28.0.0/16
   - action: Allow  # Allow everything else
 ```
 
