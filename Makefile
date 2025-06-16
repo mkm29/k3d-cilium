@@ -1,6 +1,6 @@
 # Setup some variables
 CLUSTER_NAME ?= calico
-K3D_CONFIG ?= infrastructure/k3d/calico-config.yaml
+K3D_CONFIG ?= k3d-calico-config.yaml
 
 # HELP
 # This will output the help for each task
