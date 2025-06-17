@@ -20,13 +20,13 @@ hubble:
     dashboards:
       enabled: true
     serviceMonitor:
-      enabled: false
+      enabled: true
   relay:
     enabled: true
     prometheus:
       enabled: true
       serviceMonitor:
-        enabled: false
+        enabled: true
   tls:
     auto:
       enabled: true
