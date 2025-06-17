@@ -41,10 +41,11 @@ charts/*.tgz
 requirements.lock
 
 # Sensitive data
-.env
-.env.local
-.env.*.local
-secrets/
+#.env
+#.env.local
+#.env.*.local
+.env.decrypted
+.secrets.env
 *.key
 *.pem
 *.crt
@@ -80,6 +81,7 @@ out/
 # k3d specific
 k3d-registry.yaml
 .k3d/
+infrastructure/k3d/registries-processed.yaml
 
 # Podman specific
 podman-compose.yml

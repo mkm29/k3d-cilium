@@ -1,0 +1,21 @@
+registries:
+  create:
+    name: registry.uds
+    host: "0.0.0.0"
+    hostPort: "5000"
+    proxy:
+      remoteURL: https://registry-1.docker.io
+      username: "$DOCKER_HUB_USERNAME"
+      password: "$DOCKER_HUB_PASSWORD"
+    volumes:
+      - ~/.k3d/cache:/var/lib/registry
+  mirrors:
+    registry1.dso.mil:
+      endpoint:
+        - http://registry1.dso.mil
+
+  configs:
+    registry1.dso.mil:
+      auth:
+        username: $IRONBANK_USERNAME
+        password: $IRONBANK_PASSWORD
