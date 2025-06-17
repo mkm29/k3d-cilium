@@ -58,6 +58,9 @@ Calico is a cloud-native networking and network security solution for containers
 | k3s | v1.31.5+ | Lightweight Kubernetes |
 | kubectl | Latest | Kubernetes CLI |
 | Helm | 3.x | Package management |
+| just | Latest | Command runner (replaces make) |
+| sops | Latest | Secrets encryption (optional) |
+| envsubst | Latest | Environment variable substitution |
 | calicoctl | v3.30.3+ | Calico management (optional) |
 
 ### System Requirements
@@ -285,22 +288,63 @@ Host localhost 127.0.0.1
     StrictHostKeyChecking no
 EOF
 
-# 4. (Optional) Configure via .env file
-echo "CLUSTER_NAME=calico" > .env
-echo "K3D_CONFIG=infrastructure/k3d/calico-config.yaml" >> .env
+# 4. (Optional) Set up encrypted registry credentials
+# Create .secrets.enc.env with encrypted credentials
+sops -e -i .secrets.enc.env
 
-# 5. Create cluster with Calico (default)
+# 5. (Optional) Configure via cluster.env file
+echo "CLUSTER_NAME=calico" > cluster.env
+echo "K3D_CONFIG=infrastructure/k3d/calico-config.yaml" >> cluster.env
+
+# 6. Create cluster with Calico (default)
 just setup-calico
 
-# 6. Verify installation
+# 7. Verify installation
 kubectl get pods -n calico-system
 kubectl get pods -n tigera-operator
 
-# 7. (Optional) Enable eBPF dataplane
+# 8. (Optional) Enable eBPF dataplane
 just enable-calico-ebpf
 ```
 
 ## Detailed Setup Guide
+
+### Step 0: Prerequisites Installation
+
+#### Install just (Command Runner)
+
+```bash
+# macOS
+brew install just
+
+# Linux
+cargo install just
+# or
+wget -qO - 'https://proget.makedeb.org/debian-feeds/prebuilt-mpr/pool/just_1.14.0_amd64/just_1.14.0_amd64.deb' | sudo dpkg -i -
+```
+
+#### Install SOPS (Optional - for encrypted secrets)
+
+```bash
+# macOS
+brew install sops
+
+# Linux
+wget https://github.com/mozilla/sops/releases/download/v3.8.1/sops-v3.8.1.linux.amd64
+sudo mv sops-v3.8.1.linux.amd64 /usr/local/bin/sops
+sudo chmod +x /usr/local/bin/sops
+```
+
+#### Install envsubst (Usually included with gettext)
+
+```bash
+# macOS
+brew install gettext
+
+# Linux (usually pre-installed)
+sudo apt-get install gettext-base  # Ubuntu/Debian
+sudo yum install gettext           # CentOS/RHEL
+```
 
 ### Step 1: Podman Installation and Configuration
 
@@ -356,9 +400,29 @@ export DOCKER_SOCKET=/run/user/501/podman/podman.sock
 
 # Create custom network (required for DNS)
 podman network create k3d-podman
+```
 
-# Create registry (optional, for private images)
-k3d registry create --default-network k3d-podman uds
+### Step 2.1: Registry Configuration (Optional)
+
+If you need to access private registries, set up encrypted credentials:
+
+```bash
+# Set up SOPS age key (first time only)
+mkdir -p ~/.config/sops/age
+age-keygen -o ~/.config/sops/age/keys.txt
+
+# Create encrypted secrets file
+cat > .secrets.enc.env <<EOF
+DOCKER_HUB_USERNAME=your_username
+DOCKER_HUB_PASSWORD=your_password
+IRONBANK_USERNAME=your_ironbank_username
+IRONBANK_PASSWORD=your_ironbank_password
+EOF
+
+# Encrypt the file
+sops -e -i .secrets.enc.env
+
+# The justfile will automatically decrypt and use these credentials
 ```
 
 ### Step 3: SSH Configuration
@@ -384,12 +448,19 @@ Using just:
 just preflight
 
 # Quick setup (recommended) - creates cluster and installs Calico
+# This automatically handles SOPS decryption and registry configuration
 just setup-calico
 
 # Or step by step:
-just create-cluster
+just create-cluster  # Automatically processes encrypted secrets
 just install-calico
 ```
+
+**Note**: The `create-cluster` command now automatically:
+- Decrypts `.secrets.enc.env` (if present)
+- Processes `registries.yaml` with environment variable substitution
+- Configures k3d with the processed registry configuration
+- Cleans up temporary files after cluster creation
 
 **Note about Calico installation**: The installation process now:
 
@@ -426,9 +497,9 @@ You can use any k3d configuration file:
 # Option 1: Use environment variables
 CLUSTER_NAME=my-cluster K3D_CONFIG=my-custom-config.yaml just create-cluster
 
-# Option 2: Create a .env file
-echo "CLUSTER_NAME=my-cluster" > .env
-echo "K3D_CONFIG=my-custom-config.yaml" >> .env
+# Option 2: Create a cluster.env file
+echo "CLUSTER_NAME=my-cluster" > cluster.env
+echo "K3D_CONFIG=my-custom-config.yaml" >> cluster.env
 just create-cluster
 
 # Option 3: Export variables in your shell
@@ -486,27 +557,42 @@ calicoctl version
 
 The justfile includes several settings that affect command execution:
 
-- **Shell**: Uses `zsh` with `-cu` flags (exits on error, treats unset variables as errors)
+- **Shell**: Uses `zsh` with `-c` flag for compatibility
 - **Export**: All just variables are automatically exported as environment variables
-- **Ignore Comments**: Comments in `.env` files are ignored
+- **Ignore Comments**: Comments in environment files are ignored
 - **Quiet Mode**: Suppresses just's command echoing for cleaner output (use `just --verbose` to see commands)
-- **Dotenv Loading**: Automatically loads `.env` files if present in the current directory
+- **Dotenv Loading**: Automatically loads `cluster.env` files if present in the current directory
+- **SOPS Integration**: Automatically handles encrypted `.secrets.enc.env` files
 
 #### Environment Variables
 
-You can configure the following variables via environment or `.env` file:
+You can configure the following variables via environment or `cluster.env` file:
 
 - `CLUSTER_NAME`: k3d cluster name (default: "calico")
 - `K3D_CONFIG`: Path to k3d config file (default: "infrastructure/k3d/calico-config.yaml")
 
-Example `.env` file (see `.env.example` for a template):
+Example `cluster.env` file:
 ```bash
-# Copy from .env.example
-cp .env.example .env
-
-# Or create manually
+# Create cluster.env file
 CLUSTER_NAME=my-cluster
 K3D_CONFIG=infrastructure/k3d/cilium-config.yaml
+```
+
+#### Registry Credentials (Optional)
+
+For private registry access, create an encrypted `.secrets.enc.env` file:
+
+```bash
+# Create and encrypt secrets
+cat > .secrets.enc.env <<EOF
+DOCKER_HUB_USERNAME=your_username
+DOCKER_HUB_PASSWORD=your_password
+IRONBANK_USERNAME=your_ironbank_username
+IRONBANK_PASSWORD=your_ironbank_password
+EOF
+
+# Encrypt the file
+sops -e -i .secrets.enc.env
 ```
 
 ### Just Recipes
@@ -515,14 +601,17 @@ K3D_CONFIG=infrastructure/k3d/cilium-config.yaml
 |--------|-------------|--------------|-----------|
 | `default` | Show available commands | - | - |
 | `preflight` | Check required tools | - | - |
-| `create-cluster` | Create k3d cluster | preflight | `K3D_CONFIG`, `CLUSTER_NAME` |
+| `decrypt-sops` | Decrypt SOPS environment file | - | - |
+| `process-registries` | Process registries.yaml with env vars | decrypt-sops | - |
+| `cleanup-temp` | Clean up temporary files | - | - |
+| `create-cluster` | Create k3d cluster | preflight, decrypt-sops, process-registries | `K3D_CONFIG`, `CLUSTER_NAME` |
 | `install-prometheus-crds` | Install Prometheus CRDs | - | - |
 | `install-gateway-api` | Install Gateway API CRDs | - | - |
 | `install-calico` | Install Calico CNI | - | - |
 | `enable-calico-ebpf` | Enable eBPF dataplane for Calico | - | - |
 | `disable-calico-ebpf` | Disable eBPF dataplane (revert to iptables) | - | - |
 | `uninstall-calico` | Remove Calico | - | - |
-| `delete-cluster` | Delete k3d cluster | - | `CLUSTER_NAME` |
+| `delete-cluster` | Delete k3d cluster | cleanup-temp | `CLUSTER_NAME` |
 | `setup-cilium` | Complete Cilium setup | - | `K3D_CONFIG`, `CLUSTER_NAME` |
 | `setup-calico` | Complete Calico setup | - | `K3D_CONFIG`, `CLUSTER_NAME` |
 | `setup-calico-ebpf` | Calico with eBPF setup | - | `K3D_CONFIG`, `CLUSTER_NAME` |

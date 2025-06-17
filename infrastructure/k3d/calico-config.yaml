@@ -34,13 +34,3 @@ options:
       - arg: --disable=traefik
         nodeFilters:
           - server:*
-# registries:
-#   mirrors:
-#     registry1.dso.mil:
-#       endpoint:
-#         - http://registry1.dso.mil
-#   configs:
-#     registry1.dso.mil:
-#       auth:
-#         username: <IRONBANK_USERNAME>
-#         password: <IRONBANK_PASSWORD>

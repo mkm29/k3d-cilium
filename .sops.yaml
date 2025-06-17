@@ -1,0 +1,10 @@
+---
+# This file is needed by the Simple SOPS Settings plugin to match the public key to the encrypted file.
+
+creation_rules:
+
+  - path_regex: .*\/?\.secrets\.env
+    age: age1dmxw2j4aljq3hht2m3tlatlv8kq9hx3prqyeu07klnm75r2gz3usvycvhz
+
+  - path_regex: .*\/?\.secrets\.json
+    age: age1dmxw2j4aljq3hht2m3tlatlv8kq9hx3prqyeu07klnm75r2gz3usvycvhz
