@@ -1,16 +1,55 @@
-set shell := ["zsh", "-cu"]
+# All arguments will be passed as positional arguments.
+set positional-arguments
+# Use zsh for all shells
+set shell := ["zsh", "-c"]
+# The export setting causes all just variables to be exported as environment variables. Defaults to false.
 set export := true
 set ignore-comments := true
 set quiet := true
 set dotenv-load := true
+set dotenv-filename := cluster.env
 
 # Variables with defaults
 cluster_name := env_var_or_default("CLUSTER_NAME", "calico")
 k3d_config := env_var_or_default("K3D_CONFIG", "infrastructure/k3d/calico-config.yaml")
 
+# SOPS_AGE_KEY_FILE is used by SOPS and points to the AGE key file
+# age-genkey does not save the key. It needs to be explicitly saved in this location for SOPS to find it.
+export SOPS_AGE_KEY_FILE := clean(join(env_var('HOME'), '.config/sops/age/keys.txt'))
+
 # Default recipe - show help
 default:
     @just --list
+
+# Decrypt SOPS environment file and export variables
+decrypt-sops:
+    @echo "Decrypting SOPS environment file..."
+    @if [ ! -f .secrets.enc.env ]; then \
+        echo "Error: .secrets.env file not found"; \
+        exit 1; \
+    fi
+    @if ! command -v sops > /dev/null 2>&1; then \
+        echo "Error: sops is not installed. Please install sops and try again."; \
+        exit 1; \
+    fi
+    @sops --decrypt --output-type=dotenv .secrets.enc.env > .secrets.env
+
+# Process registries.yaml by substituting environment variables
+process-registries:
+    @echo "Processing registries.yaml with environment variables..."
+    @if [ ! -f .secrets.env ]; then \
+        echo "Error: .secrets.env file not found. Run 'just decrypt-sops' first."; \
+        exit 1; \
+    fi
+    @export $(cat .secrets.env | xargs) && \
+        envsubst < infrastructure/k3d/registries.yaml > infrastructure/k3d/registries-processed.yaml
+    @echo "Processed registries saved to infrastructure/k3d/registries-processed.yaml"
+
+# Clean up temporary files
+cleanup-temp:
+    @echo "Cleaning up temporary files..."
+    @rm -f .secrets.env infrastructure/k3d/registries-processed.yaml
+    @echo "Temporary files removed."
 
 # Run preflight checks
 preflight:
@@ -38,12 +77,18 @@ preflight:
     @if ! command -v calicoctl > /dev/null 2>&1; then \
         echo "Warning: calicoctl is not installed. You may need it for advanced Calico operations."; \
     fi
+    @if ! command -v sops > /dev/null 2>&1; then \
+        echo "Warning: sops is not installed. You may need it for encrypted configuration files."; \
+    fi
+    @if ! command -v envsubst > /dev/null 2>&1; then \
+        echo "Warning: envsubst is not installed. You may need it for environment variable substitution."; \
+    fi
     @echo "All preflight checks passed."
 
 # Create a k3d cluster (use K3D_CONFIG env var to specify config file)
-create-cluster: preflight
+create-cluster: preflight decrypt-sops process-registries
     @echo "Creating k3d cluster with config: {{k3d_config}}..."
-    @k3d cluster create {{cluster_name}} --config {{k3d_config}}
+    @k3d cluster create {{cluster_name}} --config {{k3d_config}} --registry-config infrastructure/k3d/registries-processed.yaml
     @echo "Cluster {{cluster_name}} created successfully."
 
 # Patch nodes to mount BPF filesystem
@@ -55,7 +100,7 @@ patch-nodes:
     fi
     @for node in $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}'); do \
         echo "Configuring mounts for $node"; \
-        docker exec -i $node /bin/sh -c ' \
+        docker exec -i "$node" /bin/sh -c ' \
             mount bpffs -t bpf /sys/fs/bpf && \
             mount --make-shared /sys/fs/bpf && \
             mkdir -p /run/cilium/cgroupv2 && \
@@ -153,7 +198,7 @@ disable-calico-ebpf:
     @echo "eBPF dataplane disabled successfully."
 
 # Delete the k3d cluster
-delete-cluster:
+delete-cluster: cleanup-temp
     @echo "Deleting k3d cluster {{cluster_name}}..."
     @k3d cluster delete {{cluster_name}}
     @echo "Cluster {{cluster_name}} deleted successfully."
