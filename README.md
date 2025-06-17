@@ -285,16 +285,19 @@ Host localhost 127.0.0.1
     StrictHostKeyChecking no
 EOF
 
-# 4. Create cluster with Calico (default)
-make create-cluster
-make install-calico
+# 4. (Optional) Configure via .env file
+echo "CLUSTER_NAME=calico" > .env
+echo "K3D_CONFIG=infrastructure/k3d/calico-config.yaml" >> .env
 
-# 5. Verify installation
+# 5. Create cluster with Calico (default)
+just setup-calico
+
+# 6. Verify installation
 kubectl get pods -n calico-system
 kubectl get pods -n tigera-operator
 
-# 6. (Optional) Enable eBPF dataplane
-make enable-calico-ebpf
+# 7. (Optional) Enable eBPF dataplane
+just enable-calico-ebpf
 ```
 
 ## Detailed Setup Guide
@@ -374,17 +377,18 @@ Host 127.0.0.1
 
 ### Step 4: Cluster Creation
 
-Using the Makefile:
+Using just:
 
 ```bash
 # Run preflight checks
-make preflight
+just preflight
 
-# Create cluster with Calico config (default)
-make create-cluster
+# Quick setup (recommended) - creates cluster and installs Calico
+just setup-calico
 
-# Install Calico
-make install-calico
+# Or step by step:
+just create-cluster
+just install-calico
 ```
 
 **Note about Calico installation**: The installation process now:
@@ -401,10 +405,10 @@ Calico supports an eBPF dataplane for improved performance and reduced CPU usage
 
 ```bash
 # Enable eBPF dataplane (requires kernel 5.3+)
-make enable-calico-ebpf
+just enable-calico-ebpf
 
 # To revert back to iptables dataplane
-make disable-calico-ebpf
+just disable-calico-ebpf
 ```
 
 **eBPF Requirements**:
@@ -419,8 +423,18 @@ make disable-calico-ebpf
 You can use any k3d configuration file:
 
 ```bash
-# Use custom config and cluster name
-make create-cluster CLUSTER_NAME=my-cluster K3D_CONFIG=my-custom-config.yaml
+# Option 1: Use environment variables
+CLUSTER_NAME=my-cluster K3D_CONFIG=my-custom-config.yaml just create-cluster
+
+# Option 2: Create a .env file
+echo "CLUSTER_NAME=my-cluster" > .env
+echo "K3D_CONFIG=my-custom-config.yaml" >> .env
+just create-cluster
+
+# Option 3: Export variables in your shell
+export CLUSTER_NAME=my-cluster
+export K3D_CONFIG=my-custom-config.yaml
+just create-cluster
 ```
 
 ### Step 5: Verification
@@ -468,20 +482,52 @@ calicoctl version
 
 ## Configuration Reference
 
-### Makefile Targets
+### Just Configuration
 
-| Target | Description | Dependencies | Variables |
+The justfile includes several settings that affect command execution:
+
+- **Shell**: Uses `zsh` with `-cu` flags (exits on error, treats unset variables as errors)
+- **Export**: All just variables are automatically exported as environment variables
+- **Ignore Comments**: Comments in `.env` files are ignored
+- **Quiet Mode**: Suppresses just's command echoing for cleaner output (use `just --verbose` to see commands)
+- **Dotenv Loading**: Automatically loads `.env` files if present in the current directory
+
+#### Environment Variables
+
+You can configure the following variables via environment or `.env` file:
+
+- `CLUSTER_NAME`: k3d cluster name (default: "calico")
+- `K3D_CONFIG`: Path to k3d config file (default: "infrastructure/k3d/calico-config.yaml")
+
+Example `.env` file (see `.env.example` for a template):
+```bash
+# Copy from .env.example
+cp .env.example .env
+
+# Or create manually
+CLUSTER_NAME=my-cluster
+K3D_CONFIG=infrastructure/k3d/cilium-config.yaml
+```
+
+### Just Recipes
+
+| Recipe | Description | Dependencies | Variables |
 |--------|-------------|--------------|-----------|
-| `help` | Show available commands | - | - |
+| `default` | Show available commands | - | - |
 | `preflight` | Check required tools | - | - |
 | `create-cluster` | Create k3d cluster | preflight | `K3D_CONFIG`, `CLUSTER_NAME` |
 | `install-prometheus-crds` | Install Prometheus CRDs | - | - |
 | `install-gateway-api` | Install Gateway API CRDs | - | - |
-| `install-calico` | Install Calico CNI | create-cluster | - |
-| `enable-calico-ebpf` | Enable eBPF dataplane for Calico | install-calico | - |
+| `install-calico` | Install Calico CNI | - | - |
+| `enable-calico-ebpf` | Enable eBPF dataplane for Calico | - | - |
 | `disable-calico-ebpf` | Disable eBPF dataplane (revert to iptables) | - | - |
 | `uninstall-calico` | Remove Calico | - | - |
 | `delete-cluster` | Delete k3d cluster | - | `CLUSTER_NAME` |
+| `setup-cilium` | Complete Cilium setup | - | `K3D_CONFIG`, `CLUSTER_NAME` |
+| `setup-calico` | Complete Calico setup | - | `K3D_CONFIG`, `CLUSTER_NAME` |
+| `setup-calico-ebpf` | Calico with eBPF setup | - | `K3D_CONFIG`, `CLUSTER_NAME` |
+| `status` | Show cluster status | - | `CLUSTER_NAME` |
+| `test-connectivity` | Test network connectivity | - | - |
 
 ### k3d Configuration
 
@@ -767,7 +813,7 @@ spec:
 #### Gateway API Support
 
 ```bash
-make install-gateway-api
+just install-gateway-api
 ```
 
 ### Performance Tuning
@@ -834,14 +880,14 @@ kubectl patch felixconfiguration default --type='merge' -p '{
 
 #### Switching Calico Dataplane Modes
 
-You can switch between different Calico dataplane modes using the Makefile targets:
+You can switch between different Calico dataplane modes using the just recipes:
 
 ```bash
 # Enable eBPF dataplane (recommended approach)
-make enable-calico-ebpf
+just enable-calico-ebpf
 
 # Disable eBPF and revert to iptables
-make disable-calico-ebpf
+just disable-calico-ebpf
 ```
 
 Or manually using kubectl:
