@@ -77,17 +77,21 @@ graph TB
 ## Quick Start
 
 ```bash
+# Quick setup (recommended) - complete Cilium cluster setup
+K3D_CONFIG=infrastructure/k3d/cilium-config.yaml CLUSTER_NAME=cilium just setup-cilium
+
+# Or step by step:
 # Create cluster with Cilium config
-make create-cluster K3D_CONFIG=k3d-cilium-config.yaml CLUSTER_NAME=cilium
+K3D_CONFIG=infrastructure/k3d/cilium-config.yaml CLUSTER_NAME=cilium just create-cluster
 
 # Patch nodes for BPF/cgroup support
-make patch-nodes
+just patch-nodes
 
 # Install Prometheus CRDs (for ServiceMonitor support)
-make install-prometheus-crds
+just install-prometheus-crds
 
 # Install Cilium
-make install-cilium
+just install-cilium
 
 # Verify installation
 cilium status --wait
@@ -236,7 +240,7 @@ for node in $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}'); do
 done
 
 # Remount if needed
-make patch-nodes
+just patch-nodes
 ```
 
 ### Cilium Installation Failures
