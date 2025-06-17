@@ -27,6 +27,11 @@ hubble:
       enabled: true
       serviceMonitor:
         enabled: false
+  tls:
+    auto:
+      enabled: true
+      method: "helm"
+      certValidityDuration: "1095"
   ui:
     enabled: true
 
@@ -82,15 +87,21 @@ envoy:
 #     #     extraDnsNames:
 #     #       - "*.{{ cilium_default_domain }}"
 
-# ipam:
-#   mode: kubernetes
-# socketLB:
-#   enabled: true
-#   hostNamespaceOnly: true
-# ipv4:
-#   enabled: true
-# nodePort:
-#   enabled: true
+ipam:
+  mode: kubernetes
+
+externalIPs:
+  enabled: true
+nodePort:
+  enabled: true
+hostPort:
+  enabled: true
+socketLB:
+  enabled: true
+  hostNamespaceOnly: true
+ipv4:
+  enabled: true
+ipv4NativeRoutingCIDR: "10.0.0.0/9"
 
 monitor:
   # -- Enable the cilium-monitor sidecar.
