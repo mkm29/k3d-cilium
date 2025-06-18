@@ -78,11 +78,11 @@ graph TB
 
 ```bash
 # Quick setup (recommended) - complete Cilium cluster setup
-K3D_CONFIG=infrastructure/k3d/cilium-config.yaml CLUSTER_NAME=cilium just setup-cilium
+CLUSTER_TYPE=cilium CLUSTER_NAME=cilium just setup-cilium
 
 # Or step by step:
 # Create cluster with Cilium config
-K3D_CONFIG=infrastructure/k3d/cilium-config.yaml CLUSTER_NAME=cilium just create-cluster
+CLUSTER_TYPE=cilium CLUSTER_NAME=cilium just create-cluster
 
 # Patch nodes for BPF/cgroup support
 just patch-nodes

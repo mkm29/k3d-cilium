@@ -7,53 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2025-01-18
+
 ### Added
 
-- SOPS integration for encrypted registry credentials
-- Automatic environment variable substitution in registries.yaml
-- New justfile recipes for SOPS operations (`decrypt-sops`, `process-registries`, `cleanup-temp`)
-- Support for `.secrets.enc.env` encrypted credential files
-- Automatic cleanup of temporary sensitive files
-- Enhanced preflight checks for SOPS and envsubst tools
-- Service monitor support for Hubble and Prometheus in Cilium values.yaml
-- Enhanced observability configuration for Cilium
-- Complete k3d cluster automation with justfile
-- Support for both Calico and Cilium CNI configurations
-- Comprehensive documentation with architecture diagrams
-- eBPF dataplane support for both Calico and Cilium
-- Production-ready configurations for development environments
-- Multi-CNI support with dedicated configuration files
-- Advanced networking features including BGP and network policies
-- Prometheus metrics integration
-- Gateway API support
-- Comprehensive troubleshooting documentation
-- Initial project setup with basic k3d and Podman integration
-- Basic Calico CNI support
-- Fundamental documentation and setup guides
-- Core networking configuration
+- **Multi-CNI Support**: Complete support for both Calico and Cilium CNI with dedicated configuration files
+- **Docker Support**: Added Docker as a recommended container runtime option, especially for macOS users
+- **Dynamic Configuration**: k3d config file now automatically selected based on `CNI_TYPE` variable
+- **SOPS Integration**: Encrypted registry credentials using SOPS with AGE encryption
+  - Automatic environment variable substitution in registries.yaml
+  - New justfile recipes for SOPS operations (`decrypt-sops`, `process-registries`, `cleanup-temp`)
+  - Support for `.secrets.enc.env` encrypted credential files
+  - Automatic cleanup of temporary sensitive files
+- **Enhanced Observability**:
+  - Service monitor support for Hubble and Prometheus in Cilium values.yaml
+  - Prometheus metrics integration for both CNIs
+  - Complete monitoring configuration for production readiness
+- **eBPF Support**: 
+  - Full eBPF dataplane support for both Calico and Cilium
+  - Dedicated recipes for enabling/disabling eBPF mode
+  - Comprehensive eBPF documentation and troubleshooting
+- **Advanced Networking Features**:
+  - BGP support for Calico
+  - Network policies for both CNIs
+  - Gateway API support
+  - Multiple IP pool management
+- **Production-Ready Configurations**:
+  - Consistent subnet configuration across CNIs
+  - Updated to Calico v3.30.1 and latest Cilium
+  - k3s v1.31.5+ support
+- **Comprehensive Documentation**:
+  - Architecture diagrams using Mermaid
+  - Detailed setup guides for both Docker and Podman
+  - Troubleshooting section with common issues and solutions
+  - Advanced topics covering performance tuning and custom configurations
+- **Automation**:
+  - Complete k3d cluster automation with justfile
+  - Quick setup recipes for both CNIs
+  - Preflight checks for all required tools
+  - Cross-platform support with justfile
 
 ### Changed
 
-- Updated shell configuration in justfile from `-cu` to `-c` for better compatibility
-- Modified `create-cluster` recipe to automatically handle SOPS decryption and registry processing
-- Updated `delete-cluster` recipe to include automatic cleanup of temporary files
-- Enhanced .gitignore to exclude sensitive temporary files
-- Updated Cilium configuration with improved monitoring capabilities
-- Migrated from Makefile to justfile for better cross-platform support
-- Updated to use Calico v3.30.0 and Cilium latest versions
-- Enhanced cluster configuration with consistent subnet and image versions
-- Improved documentation structure with detailed setup guides
+- **Variable Naming**: Renamed `cluster_type` to `cni_type` for clarity
+- **Configuration Path**: k3d config now uses dynamic path `infrastructure/k3d/config/${CNI_TYPE}.yaml`
+- **Default Values**: 
+  - Default cluster name changed to "uds-dev"
+  - Default CNI type is "calico"
+- **Documentation Structure**:
+  - Split README into main README.md and README-CILIUM.md
+  - Updated all examples to show both Docker and Podman options
+  - Added warnings about Podman limitations on macOS
+- **Repository References**: Updated from k3d-podman to k3d-cilium throughout
+- **Shell Configuration**: Updated justfile from `-cu` to `-c` for better compatibility
+- **Resource Management**: Using server-side apply for CRDs
 
 ### Fixed
 
 - Shell parameter errors when using justfile with strict zsh configurations
 - SSH_CONNECTION parameter not set error in justfile execution
-- Server-side apply configurations for better resource management
-- Subnet consistency across different CNI configurations
-- Image version alignment for reliable deployments
 - k3d cluster creation failure due to smart quotes in cluster-cidr configuration
 - Connectivity test race condition where CNI policies weren't fully applied before testing
-- Test output verbosity - connectivity test now only checks for HTTP 200 status instead of printing full response
+- Test output verbosity - connectivity test now only checks for HTTP 200 status
+- Calico installation process to use `kubectl create` instead of `apply` for initial resources
+- Container IP forwarding automatically enabled for Calico
 
 ### Security
 
@@ -61,7 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic cleanup of decrypted credential files
 - Enhanced .gitignore patterns for sensitive data protection
 - Implemented secure defaults for network policies
-- Enhanced security configurations for production readiness
+- Registry authentication properly handled through encrypted environment files
 
 ## Contributors
 
@@ -72,3 +89,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Project Repository](https://github.com/mkm29/k3d-cilium)
 - [Issue Tracker](https://github.com/mkm29/k3d-cilium/issues)
 - [Documentation](https://github.com/mkm29/k3d-cilium/blob/main/README.md)
+
+[Unreleased]: https://github.com/mkm29/k3d-cilium/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/mkm29/k3d-cilium/releases/tag/v0.1.0
