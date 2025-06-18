@@ -5,7 +5,7 @@ metadata:
 servers: 1
 agents: 2
 image: rancher/k3s:v1.32.5-k3s1
-subnet: "172.28.0.0/16"
+subnet: "10.42.0.0/16"
 ports:
   - port: 8080:80
     nodeFilters:
@@ -39,9 +39,9 @@ options:
       - arg: --disable-kube-proxy
         nodeFilters:
           - server:*
-      - arg: --cluster-cidr="172.28.0.0/16"
+      - arg: --cluster-cidr=10.42.0.0/16
         nodeFilters:
           - server:*
-      - arg: --service-cidr="10.42.0.0/16"
+      - arg: --service-cidr=10.96.0.0/12
         nodeFilters:
           - server:*

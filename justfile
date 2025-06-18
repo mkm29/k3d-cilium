@@ -7,7 +7,7 @@ set export := true
 set ignore-comments := true
 set quiet := true
 set dotenv-load := true
-set dotenv-filename := cluster.env
+set dotenv-filename := 'cluster.env'
 
 # Variables with defaults
 cluster_name := env_var_or_default("CLUSTER_NAME", "calico")
@@ -247,5 +247,10 @@ test-connectivity:
         kubectl create deployment nginx --image=nginx --replicas=2 || true; \
         kubectl wait --for=condition=available --timeout=60s deployment/nginx; \
         kubectl expose deployment nginx --port=80 --type=ClusterIP || true; \
-        kubectl run test-pod --image=busybox --rm -it --restart=Never -- wget -O- http://nginx; \
+        echo "Waiting for network policies to be applied..."; \
+        sleep 5; \
+        kubectl run test-pod --image=busybox --rm -it --restart=Never -- wget --spider -S http://nginx 2>&1 | grep "HTTP/" | grep "200"; \
+        kubectl delete svc/nginx; \
+        kubectl delete deployment/nginx; \
+        echo "Basic connectivity test completed."; \
     fi
