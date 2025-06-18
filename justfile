@@ -26,7 +26,7 @@ default:
 decrypt-sops:
     @echo "Decrypting SOPS environment file..."
     @if [ ! -f .secrets.enc.env ]; then \
-        echo "Error: .secrets.env file not found"; \
+        echo "Error: .secrets.enc.env file not found"; \
         exit 1; \
     fi
     @if ! command -v sops > /dev/null 2>&1; then \
@@ -43,13 +43,13 @@ process-registries:
         exit 1; \
     fi
     @export $(cat .secrets.env | xargs) && \
-        envsubst < infrastructure/k3d/registries.yaml > infrastructure/k3d/registries-processed.yaml
-    @echo "Processed registries saved to infrastructure/k3d/registries-processed.yaml"
+        envsubst < infrastructure/k3d/config/registries.yaml > infrastructure/k3d/config/registries-processed.yaml
+    @echo "Processed registries saved to infrastructure/k3d/config/registries-processed.yaml"
 
 # Clean up temporary files
 cleanup-temp:
     @echo "Cleaning up temporary files..."
-    @rm -f .secrets.env infrastructure/k3d/registries-processed.yaml
+    @rm -f .secrets.env infrastructure/k3d/config/registries-processed.yaml
     @echo "Temporary files removed."
 
 # Run preflight checks
@@ -89,7 +89,7 @@ preflight:
 # Create a k3d cluster (use K3D_CONFIG env var to specify config file)
 create-cluster: preflight decrypt-sops process-registries
     @echo "Creating k3d cluster with config: {{k3d_config}}..."
-    @k3d cluster create {{cluster_name}} --config {{k3d_config}} --registry-config infrastructure/k3d/registries-processed.yaml
+    @k3d cluster create {{cluster_name}} --config {{k3d_config}} --registry-config infrastructure/k3d/config/registries-processed.yaml
     @echo "Cluster {{cluster_name}} created successfully."
 
 # Patch nodes to mount BPF filesystem
@@ -240,7 +240,7 @@ status:
 
 # Test connectivity (works for both Cilium and Calico)
 test-connectivity:
-    @if [[ "{{cni_type}}" = "cilium " ]]; then \
+    @if [[ "{{cni_type}}" = "cilium" ]]; then \
         echo "Running Cilium connectivity test..."; \
         cilium connectivity test; \
     elif [[ "{{cni_type}}" = "calico" ]]; then \

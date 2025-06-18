@@ -15,6 +15,10 @@ ports:
       - loadbalancer
 options:
   k3s:
+    nodeLabels:
+      - label: kubernetes.io/role=worker
+        nodeFilters:
+          - agent:*
     extraArgs:
       # Disable default k3s network components to use Calico
       - arg: --flannel-backend=none

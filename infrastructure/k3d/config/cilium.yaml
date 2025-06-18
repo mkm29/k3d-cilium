@@ -33,7 +33,7 @@ options:
       - arg: --disable=traefik
         nodeFilters:
           - server:*
-      - arg: --disable servicelb
+      - arg: --disable=servicelb
         nodeFilters:
           - server:*
       - arg: --disable-kube-proxy
