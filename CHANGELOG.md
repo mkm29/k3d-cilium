@@ -51,6 +51,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Server-side apply configurations for better resource management
 - Subnet consistency across different CNI configurations
 - Image version alignment for reliable deployments
+- k3d cluster creation failure due to smart quotes in cluster-cidr configuration
+- Connectivity test race condition where CNI policies weren't fully applied before testing
+- Test output verbosity - connectivity test now only checks for HTTP 200 status instead of printing full response
 
 ### Security
 
