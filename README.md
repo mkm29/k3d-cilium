@@ -361,8 +361,8 @@ wget -qO - 'https://proget.makedeb.org/debian-feeds/prebuilt-mpr/pool/just_1.14.
 brew install sops
 
 # Linux
-wget https://github.com/mozilla/sops/releases/download/v3.8.1/sops-v3.8.1.linux.amd64
-sudo mv sops-v3.8.1.linux.amd64 /usr/local/bin/sops
+wget https://github.com/mozilla/sops/releases/download/v3.10.2/sops-v3.10.2.linux.amd64
+sudo mv sops-v3.10.2.linux.amd64 /usr/local/bin/sops
 sudo chmod +x /usr/local/bin/sops
 ```
 
