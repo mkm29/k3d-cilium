@@ -805,6 +805,52 @@ kubectl logs -n calico-system -l k8s-app=calico-node | grep -i bpf
 kubectl exec -n calico-system ds/calico-node -- grep CONFIG_BPF /boot/config-$(uname -r)
 ```
 
+#### 4. k3d Configuration Issues
+
+**Problem**: Invalid CIDR address error when creating cluster
+
+```bash
+Error: invalid cluster-cidr "10.42.0.0/16": invalid CIDR address: "10.42.0.0/16"
+```
+
+**Solution**:
+
+This error occurs when smart quotes are used in the k3d configuration file instead of regular quotes.
+
+```bash
+# Check for smart quotes in your config
+cat infrastructure/k3d/calico-config.yaml | grep cluster-cidr
+
+# Fix by removing quotes from CIDR values
+# Bad:  - arg: --cluster-cidr="10.42.0.0/16"
+# Good: - arg: --cluster-cidr=10.42.0.0/16
+```
+
+#### 5. Connectivity Test Issues
+
+**Problem**: Connectivity test fails on first run with "Operation not permitted"
+
+```bash
+wget: can't connect to remote host (10.x.x.x): Operation not permitted
+```
+
+**Solution**:
+
+This is a race condition where the CNI hasn't fully configured network policies before the test runs.
+
+```bash
+# The justfile now includes a 5-second delay to allow CNI setup
+# If you still experience issues, increase the delay or check CNI status:
+
+# For Calico
+kubectl get pods -n calico-system -o wide
+kubectl logs -n calico-system -l k8s-app=calico-node | tail -50
+
+# For Cilium
+kubectl get pods -n kube-system -l k8s-app=cilium
+cilium status
+```
+
 ### Debug Commands
 
 ```bash
