@@ -10,8 +10,9 @@ set dotenv-load := true
 set dotenv-filename := 'cluster.env'
 
 # Variables with defaults
-cluster_name := env_var_or_default("CLUSTER_NAME", "calico")
-k3d_config := env_var_or_default("K3D_CONFIG", "infrastructure/k3d/calico-config.yaml")
+cni_type := env_var_or_default("CNI_TYPE", "calico")
+cluster_name := env_var_or_default("CLUSTER_NAME", "uds-dev")
+k3d_config := "infrastructure/k3d/config/" + cni_type + ".yaml"
 
 # SOPS_AGE_KEY_FILE is used by SOPS and points to the AGE key file
 # age-genkey does not save the key. It needs to be explicitly saved in this location for SOPS to find it.
@@ -239,10 +240,10 @@ status:
 
 # Test connectivity (works for both Cilium and Calico)
 test-connectivity:
-    @if command -v cilium > /dev/null 2>&1 && kubectl get ns | grep -q cilium; then \
+    @if [[ "{{cni_type}}" = "cilium " ]]; then \
         echo "Running Cilium connectivity test..."; \
         cilium connectivity test; \
-    else \
+    elif [[ "{{cni_type}}" = "calico" ]]; then \
         echo "Running basic connectivity test..."; \
         kubectl create deployment nginx --image=nginx --replicas=2 || true; \
         kubectl wait --for=condition=available --timeout=60s deployment/nginx; \
@@ -253,4 +254,7 @@ test-connectivity:
         kubectl delete svc/nginx; \
         kubectl delete deployment/nginx; \
         echo "Basic connectivity test completed."; \
+    else \
+        echo "Unknown CNI type: {{cni_type}}. Cannot run connectivity test."; \
+        exit 1; \
     fi

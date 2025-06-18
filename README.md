@@ -1,6 +1,6 @@
-# k3d with Podman and Calico CNI
+# k3d with Docker/Podman and Calico CNI
 
-A comprehensive guide for running k3d (Kubernetes in Docker) clusters using Podman as the container runtime with Calico CNI for advanced networking, security, and network policy management.
+A comprehensive guide for running k3d (Kubernetes in Docker) clusters using Docker or Podman as the container runtime with Calico CNI for advanced networking, security, and network policy management.
 
 > **Note**: For Cilium CNI setup, please refer to [README-CILIUM.md](README-CILIUM.md)
 
@@ -20,7 +20,7 @@ A comprehensive guide for running k3d (Kubernetes in Docker) clusters using Podm
 
 This project demonstrates how to run k3d clusters with:
 
-- **Podman** as the container runtime (instead of Docker)
+- **Docker** or **Podman** as the container runtime
 - **Calico CNI** for advanced networking with optional eBPF dataplane
 - **Network Policies**: Full Kubernetes NetworkPolicy support plus Calico-specific policies
 - **BGP Support**: Advanced routing capabilities for on-premise and hybrid cloud
@@ -53,7 +53,7 @@ Calico is a cloud-native networking and network security solution for containers
 
 | Component | Version | Purpose |
 |-----------|---------|---------|
-| Podman | 5.5.1+ | Container runtime |
+| Docker/Podman | Latest/5.5.1+ | Container runtime |
 | k3d | v5.8.3+ | Kubernetes cluster management |
 | k3s | v1.31.5+ | Lightweight Kubernetes |
 | kubectl | Latest | Kubernetes CLI |
@@ -61,7 +61,7 @@ Calico is a cloud-native networking and network security solution for containers
 | just | Latest | Command runner (replaces make) |
 | sops | Latest | Secrets encryption (optional) |
 | envsubst | Latest | Environment variable substitution |
-| calicoctl | v3.30.3+ | Calico management (optional) |
+| calicoctl | v3.30.1+ | Calico management (optional) |
 
 ### System Requirements
 
@@ -108,7 +108,7 @@ Calico is a cloud-native networking and network security solution for containers
 
 - [eBPF Official Website](https://ebpf.io/)
 - [eBPF Summit Videos](https://ebpf.io/summit-2024/)
-- [Cilium eBPF Documentation](https://docs.cilium.io/en/stable/bpf/)
+- [Cilium eBPF Documentation](https://docs.calico.io/en/stable/bpf/)
 - [Calico eBPF Documentation](https://docs.tigera.io/calico/latest/operations/ebpf/)
 
 ## Architecture
@@ -273,15 +273,46 @@ graph LR
 
 ## Quick Start
 
+### Using Docker (Recommended for macOS)
+
 ```bash
 # 1. Clone the repository
-git clone https://github.com/mkm29/k3d-podman
-cd k3d-podman
+git clone https://github.com/mkm29/k3d-calico
+cd k3d-calico
+
+# 2. Ensure Docker is running
+docker version
+
+# 3. (Optional) Set up encrypted registry credentials
+# Create .secrets.enc.env with encrypted credentials
+sops -e -i .secrets.enc.env
+
+# 4. (Optional) Configure via cluster.env file
+echo "CLUSTER_NAME=uds-dev" > cluster.env
+echo "CNI_TYPE=calico" >> cluster.env
+
+# 5. Create cluster with Calico (default)
+just setup-calico
+
+# 6. Verify installation
+kubectl get pods -n calico-system
+kubectl get pods -n tigera-operator
+
+# 7. (Optional) Enable eBPF dataplane
+just enable-calico-ebpf
+```
+
+### Using Podman (Linux or experimental macOS)
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/mkm29/k3d-calico
+cd k3d-calico
 
 # 2. Initialize Podman machine (macOS only)
 podman machine init --cpus 16 --memory 16384 --disk-size 100
 
-# 3. Configure SSH (required for k3d)
+# 3. Configure SSH (required for k3d with Podman)
 cat >> ~/.ssh/config <<EOF
 Host localhost 127.0.0.1
     IdentityFile ~/.local/share/containers/podman/machine/machine
@@ -293,8 +324,8 @@ EOF
 sops -e -i .secrets.enc.env
 
 # 5. (Optional) Configure via cluster.env file
-echo "CLUSTER_NAME=calico" > cluster.env
-echo "K3D_CONFIG=infrastructure/k3d/calico-config.yaml" >> cluster.env
+echo "CLUSTER_NAME=uds-dev" > cluster.env
+echo "CNI_TYPE=calico" >> cluster.env
 
 # 6. Create cluster with Calico (default)
 just setup-calico
@@ -346,9 +377,31 @@ sudo apt-get install gettext-base  # Ubuntu/Debian
 sudo yum install gettext           # CentOS/RHEL
 ```
 
-### Step 1: Podman Installation and Configuration
+### Step 1: Container Runtime Installation and Configuration
 
-#### macOS Setup
+> **⚠️ Important Note for macOS Users (especially Apple Silicon)**
+> 
+> Rootless Podman on macOS may not work reliably with k3d, even when following the [official k3d Podman instructions](https://k3d.io/v5.8.3/usage/advanced/podman/#macos). Common issues include:
+> - SSH connection problems
+> - Container networking failures
+> - Permission issues with volume mounts
+> 
+> **Recommendation**: Use Docker Desktop on macOS for the most reliable experience. The instructions below include both Docker and Podman setup, but Docker is strongly recommended for macOS users.
+
+#### macOS Setup - Docker (Recommended)
+
+```bash
+# Install Docker Desktop
+brew install --cask docker
+
+# Start Docker Desktop from Applications
+# Ensure Docker is running:
+docker version
+
+# No additional configuration needed for k3d
+```
+
+#### macOS Setup - Podman (Experimental, may not work)
 
 ```bash
 # Install Podman
@@ -374,7 +427,22 @@ podman machine ssh bash -e <<EOF
 EOF
 ```
 
-#### Linux Setup
+#### Linux Setup - Docker
+
+```bash
+# Install Docker (Ubuntu/Debian)
+sudo apt-get update
+sudo apt-get install -y docker.io
+
+# Add user to docker group
+sudo usermod -aG docker $USER
+newgrp docker
+
+# Enable Docker
+sudo systemctl enable --now docker
+```
+
+#### Linux Setup - Podman
 
 ```bash
 # Install Podman (Ubuntu/Debian)
@@ -389,6 +457,15 @@ systemctl --user enable --now podman.socket
 ```
 
 ### Step 2: Environment Configuration
+
+#### For Docker
+
+```bash
+# No additional configuration needed
+# Docker is the default for k3d
+```
+
+#### For Podman
 
 ```bash
 # Get connection details
@@ -425,7 +502,9 @@ sops -e -i .secrets.enc.env
 # The justfile will automatically decrypt and use these credentials
 ```
 
-### Step 3: SSH Configuration
+### Step 3: SSH Configuration (Podman only)
+
+> **Note**: This step is only required if you're using Podman. Docker users can skip to Step 4.
 
 Update `~/.ssh/config`:
 
@@ -491,22 +570,24 @@ just disable-calico-ebpf
 
 #### Custom Configuration
 
-You can use any k3d configuration file:
+The k3d configuration file is automatically determined based on the `CNI_TYPE` variable:
 
 ```bash
 # Option 1: Use environment variables
-CLUSTER_NAME=my-cluster K3D_CONFIG=my-custom-config.yaml just create-cluster
+CLUSTER_NAME=my-cluster CNI_TYPE=calico just create-cluster
 
 # Option 2: Create a cluster.env file
 echo "CLUSTER_NAME=my-cluster" > cluster.env
-echo "K3D_CONFIG=my-custom-config.yaml" >> cluster.env
+echo "CNI_TYPE=calico" >> cluster.env
 just create-cluster
 
 # Option 3: Export variables in your shell
 export CLUSTER_NAME=my-cluster
-export K3D_CONFIG=my-custom-config.yaml
+export CNI_TYPE=calico
 just create-cluster
 ```
+
+The configuration file will be loaded from `infrastructure/k3d/config/${CNI_TYPE}.yaml`.
 
 ### Step 5: Verification
 
@@ -534,12 +615,12 @@ The `calicoctl` command line tool provides additional management capabilities fo
 
 ```bash
 # macOS
-curl -L https://github.com/projectcalico/calico/releases/download/v3.30.3/calicoctl-darwin-amd64 -o calicoctl
+curl -L https://github.com/projectcalico/calico/releases/download/v3.30.1/calicoctl-darwin-amd64 -o calicoctl
 chmod +x calicoctl
 sudo mv calicoctl /usr/local/bin/
 
 # Linux
-curl -L https://github.com/projectcalico/calico/releases/download/v3.30.3/calicoctl-linux-amd64 -o calicoctl
+curl -L https://github.com/projectcalico/calico/releases/download/v3.30.1/calicoctl-linux-amd64 -o calicoctl
 chmod +x calicoctl
 sudo mv calicoctl /usr/local/bin/
 
@@ -568,15 +649,17 @@ The justfile includes several settings that affect command execution:
 
 You can configure the following variables via environment or `cluster.env` file:
 
-- `CLUSTER_NAME`: k3d cluster name (default: "calico")
-- `K3D_CONFIG`: Path to k3d config file (default: "infrastructure/k3d/calico-config.yaml")
+- `CLUSTER_NAME`: k3d cluster name (default: "uds-dev")
+- `CNI_TYPE`: Type of CNI to use (default: "calico"), determines which config file to use
 
 Example `cluster.env` file:
 ```bash
 # Create cluster.env file
 CLUSTER_NAME=my-cluster
-K3D_CONFIG=infrastructure/k3d/cilium-config.yaml
+CNI_TYPE=calico  # Will use infrastructure/k3d/config/calico.yaml
 ```
+
+The k3d configuration file is automatically selected as `infrastructure/k3d/config/${CNI_TYPE}.yaml`.
 
 #### Registry Credentials (Optional)
 
@@ -604,7 +687,7 @@ sops -e -i .secrets.enc.env
 | `decrypt-sops` | Decrypt SOPS environment file | - | - |
 | `process-registries` | Process registries.yaml with env vars | decrypt-sops | - |
 | `cleanup-temp` | Clean up temporary files | - | - |
-| `create-cluster` | Create k3d cluster | preflight, decrypt-sops, process-registries | `K3D_CONFIG`, `CLUSTER_NAME` |
+| `create-cluster` | Create k3d cluster | preflight, decrypt-sops, process-registries | `CNI_TYPE`, `CLUSTER_NAME` |
 | `install-prometheus-crds` | Install Prometheus CRDs | - | - |
 | `install-gateway-api` | Install Gateway API CRDs | - | - |
 | `install-calico` | Install Calico CNI | - | - |
@@ -612,9 +695,9 @@ sops -e -i .secrets.enc.env
 | `disable-calico-ebpf` | Disable eBPF dataplane (revert to iptables) | - | - |
 | `uninstall-calico` | Remove Calico | - | - |
 | `delete-cluster` | Delete k3d cluster | cleanup-temp | `CLUSTER_NAME` |
-| `setup-cilium` | Complete Cilium setup | - | `K3D_CONFIG`, `CLUSTER_NAME` |
-| `setup-calico` | Complete Calico setup | - | `K3D_CONFIG`, `CLUSTER_NAME` |
-| `setup-calico-ebpf` | Calico with eBPF setup | - | `K3D_CONFIG`, `CLUSTER_NAME` |
+| `setup-calico` | Complete Cilium setup | - | `CNI_TYPE`, `CLUSTER_NAME` |
+| `setup-calico` | Complete Calico setup | - | `CNI_TYPE`, `CLUSTER_NAME` |
+| `setup-calico-ebpf` | Calico with eBPF setup | - | `CNI_TYPE`, `CLUSTER_NAME` |
 | `status` | Show cluster status | - | `CLUSTER_NAME` |
 | `test-connectivity` | Test network connectivity | - | - |
 
@@ -682,28 +765,44 @@ The default Calico installation provides:
 
 ### Common Issues
 
-#### 1. Podman Connection Issues
+#### 1. Container Runtime Connection Issues
 
-**Problem**: k3d cannot connect to Podman
+**Problem**: k3d cannot connect to the container runtime
 
 ```bash
 Error: Cannot connect to the Docker daemon
 ```
 
-**Solution**:
+**Solution for Docker**:
+
+```bash
+# Ensure Docker Desktop is running (macOS)
+# Check Docker icon in menu bar or open Docker Desktop app
+
+# Verify Docker is running
+docker version
+
+# If on Linux, check Docker service
+sudo systemctl status docker
+sudo systemctl start docker
+```
+
+**Solution for Podman**:
 
 ```bash
 # Verify Podman is running
 podman machine list
 podman machine start
 
-# Check environment variables
+# Check environment variables (Podman only)
 echo $DOCKER_HOST
 echo $DOCKER_SOCKET
 
 # Test connection
 docker version
 ```
+
+> **macOS Note**: If using Podman on macOS and experiencing persistent issues, consider switching to Docker Desktop for better compatibility.
 
 #### 2. DNS Resolution Issues
 
@@ -720,7 +819,7 @@ nslookup: can't resolve 'kubernetes.default'
 kubectl get pods -n kube-system -l k8s-app=kube-dns
 
 # For Cilium - Verify DNS proxy
-kubectl exec -n kube-system ds/cilium -- cilium config view | grep dns
+kubectl exec -n kube-system ds/calico -- calico config view | grep dns
 
 # For Calico - Check DNS configuration
 kubectl get endpoints -n kube-system kube-dns
@@ -847,8 +946,8 @@ kubectl get pods -n calico-system -o wide
 kubectl logs -n calico-system -l k8s-app=calico-node | tail -50
 
 # For Cilium
-kubectl get pods -n kube-system -l k8s-app=cilium
-cilium status
+kubectl get pods -n kube-system -l k8s-app=calico
+calico status
 ```
 
 ### Debug Commands
