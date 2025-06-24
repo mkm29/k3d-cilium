@@ -81,7 +81,7 @@ out/
 # k3d specific
 k3d-registry.yaml
 .k3d/
-infrastructure/k3d/registries-processed.yaml
+infrastructure/k3d/config/registries-processed.yaml
 
 # Podman specific
 podman-compose.yml
@@ -94,3 +94,4 @@ coverage/
 .hypothesis/
 .pytest_cache/
 .claude
+CLAUDE.md

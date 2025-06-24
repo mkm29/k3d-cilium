@@ -183,11 +183,11 @@ enable-calico-ebpf:
     @echo "Waiting for Calico to restart with eBPF..."
     @sleep 30
     @kubectl wait --for=condition=Available tigerastatus --all --timeout=300s
+    @kubectl patch felixconfiguration default --type='merge' -p '{"spec":{"bpfConnectTimeLoadBalancing": "Disabled", "bpfExternalServiceMode": "DSR"}}'
     @echo "Verifying eBPF is enabled..."
     @kubectl get installation default -o jsonpath='{.spec.calicoNetwork.linuxDataplane}'
     @echo ""
     @echo "eBPF dataplane enabled successfully."
-    @echo "Note: DSR mode can be enabled with: kubectl patch felixconfiguration default --type='merge' -p '{\"spec\":{\"bpfExternalServiceMode\":\"DSR\"}}'"
 
 # Disable eBPF dataplane for Calico (revert to iptables)
 disable-calico-ebpf:
@@ -245,16 +245,43 @@ test-connectivity:
         cilium connectivity test; \
     elif [[ "{{cni_type}}" = "calico" ]]; then \
         echo "Running basic connectivity test..."; \
-        kubectl create deployment nginx --image=nginx --replicas=2 || true; \
+        kubectl create -f infrastructure/manifests/nginx.yaml || true; \
         kubectl wait --for=condition=available --timeout=60s deployment/nginx; \
-        kubectl expose deployment nginx --port=80 --type=ClusterIP || true; \
         echo "Waiting for network policies to be applied..."; \
         sleep 5; \
-        kubectl run test-pod --image=busybox --rm -it --restart=Never -- wget --spider -S http://nginx 2>&1 | grep "HTTP/" | grep "200"; \
-        kubectl delete svc/nginx; \
-        kubectl delete deployment/nginx; \
-        echo "Basic connectivity test completed."; \
+        echo "Creating busybox Pod on another node..."; \
+        kubectl create -f infrastructure/manifests/busybox.yaml || true; \
+        kubectl wait --for=condition=ready --timeout=60s pod/busybox; \
+        echo "Testing connectivity between pods..."; \
+        if kubectl exec -it busybox -- wget --spider -S http://nginx 2>&1 | grep "HTTP/" | grep -q "200"; then \
+            echo "✅ Connectivity test PASSED - HTTP 200 received"; \
+            test_result=0; \
+        else \
+            echo "❌ Connectivity test FAILED - HTTP 200 not received"; \
+            test_result=1; \
+        fi; \
+        echo "Cleaning up test resources..."; \
+        kubectl delete -f infrastructure/manifests/nginx.yaml --force --grace-period=0 || true; \
+        kubectl delete -f infrastructure/manifests/busybox.yaml --force --grace-period=0 || true; \
+        if [[ $test_result -eq 0 ]]; then \
+            echo "Basic connectivity test completed successfully."; \
+        else \
+            echo "Basic connectivity test failed."; \
+            exit 1; \
+        fi; \
     else \
         echo "Unknown CNI type: {{cni_type}}. Cannot run connectivity test."; \
         exit 1; \
     fi
+
+# install istio using istioctl
+install-istio:
+    @echo "Installing Istio using istioctl..."
+    @if ! command -v istioctl > /dev/null 2>&1; then \
+        echo "Error: istioctl is not installed. Please install Istio and try again."; \
+        exit 1; \
+    fi
+    istioctl install --set profile=ambient \
+        --set "components.ingressGateways[0].enabled=true" \
+        --set "components.ingressGateways[0].name=istio-ingressgateway" \
+        --skip-confirmation

@@ -10,15 +10,15 @@ ports:
   - port: 8080:80
     nodeFilters:
       - loadbalancer
-  - port: 6443:6443
+  - port: 8443:443
     nodeFilters:
       - loadbalancer
 options:
   k3s:
-    nodeLabels:
-      - label: kubernetes.io/role=worker
-        nodeFilters:
-          - agent:*
+    # nodeLabels:
+    #   - label: "node-role.kubernetes.io/worker=true"
+    #     nodeFilters:
+    #       - agent:*
     extraArgs:
       # Disable default k3s network components to use Calico
       - arg: --flannel-backend=none
@@ -31,7 +31,7 @@ options:
       - arg: --cluster-cidr=10.42.0.0/16
         nodeFilters:
           - server:*
-      - arg: --service-cidr=10.96.0.0/12
+      - arg: --service-cidr=192.168.0.0/16
         nodeFilters:
           - server:*
       # Disable traefik

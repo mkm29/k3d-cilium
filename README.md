@@ -18,15 +18,22 @@ A comprehensive guide for running k3d (Kubernetes in Docker) clusters using Dock
 
 ## Overview
 
-This project demonstrates how to run k3d clusters with:
+This project provides a complete, production-ready Kubernetes development environment that can be deployed with a single command:
+
+```bash
+just setup-calico-ebpf install-istio test-connectivity
+```
+
+This creates a k3d cluster with:
 
 - **Docker** or **Podman** as the container runtime
-- **Calico CNI** for advanced networking with optional eBPF dataplane
+- **Calico CNI** with eBPF dataplane and DSR mode for optimal performance
+- **Istio** service mesh in ambient mode for zero-touch mTLS
 - **Network Policies**: Full Kubernetes NetworkPolicy support plus Calico-specific policies
 - **BGP Support**: Advanced routing capabilities for on-premise and hybrid cloud
 - **Flexible IPAM**: Multiple IP pools and advanced IP management
-- **Multiple Dataplanes**: Choose between standard (iptables) or high-performance eBPF
-- **Production-ready** configuration with enterprise features
+- **Cross-node connectivity** validation to ensure everything works correctly
+- **Production-ready** configuration optimized for service mesh environments
 
 ## Calico CNI
 
@@ -38,14 +45,16 @@ Calico is a cloud-native networking and network security solution for containers
 
 ### Key Features
 
-- 🚀 Lightweight Kubernetes development environment
-- 🐅 Calico CNI with flexible dataplane options (iptables or eBPF)
+- 🚀 One-command deployment of complete stack: `just setup-calico-ebpf install-istio test-connectivity`
+- 🐅 Calico CNI with eBPF dataplane and DSR mode for optimal performance
+- 🕸️ Istio ambient mesh pre-configured for service mesh capabilities
 - 🔒 Enhanced security with fine-grained network policies
 - 🌐 BGP support for advanced routing scenarios
 - 🎯 Multiple IP pools for workload isolation
 - 📊 Prometheus metrics and observability
 - 📦 Registry integration for private images
-- 🔧 Production-like development environment
+- ✅ Built-in cross-node connectivity validation
+- 🔧 Production-ready configuration optimized for modern cloud-native workloads
 
 ## Prerequisites
 
@@ -273,7 +282,29 @@ graph LR
 
 ## Quick Start
 
+### Fastest Setup - Complete Stack (Recommended)
+
+Deploy a complete k3d cluster with Calico eBPF, Istio ambient mesh, and validate cross-node connectivity in one command:
+
+```bash
+# Clone and setup everything
+git clone https://github.com/mkm29/k3d-calico
+cd k3d-calico
+
+# Deploy the entire stack with validation
+just setup-calico-ebpf install-istio test-connectivity
+```
+
+This single command will:
+1. Create a k3d cluster with Calico CNI
+2. Enable Calico eBPF dataplane with DSR mode
+3. Install Istio in ambient mesh mode
+4. Run cross-node connectivity tests
+5. Report success or failure
+
 ### Using Docker (Recommended for macOS)
+
+For step-by-step setup:
 
 ```bash
 # 1. Clone the repository
@@ -303,6 +334,15 @@ just enable-calico-ebpf
 ```
 
 ### Using Podman (Linux or experimental macOS)
+
+For the complete stack in one command:
+
+```bash
+# After steps 1-3 below, run:
+just setup-calico-ebpf install-istio test-connectivity
+```
+
+Step-by-step setup:
 
 ```bash
 # 1. Clone the repository
@@ -551,10 +591,14 @@ just install-calico
 
 ##### Enabling eBPF Dataplane (Optional)
 
-Calico supports an eBPF dataplane for improved performance and reduced CPU usage. To enable it:
+Calico supports an eBPF dataplane for improved performance and reduced CPU usage. When enabled, it also configures:
+- **DSR (Direct Server Return)** mode for external services (`bpfExternalServiceMode: "DSR"`)
+- **Disabled connect-time load balancing** (`bpfConnectTimeLoadBalancing: "Disabled"`) for better compatibility with service meshes like Istio
+
+To enable it:
 
 ```bash
-# Enable eBPF dataplane (requires kernel 5.3+)
+# Enable eBPF dataplane with DSR mode (requires kernel 5.3+)
 just enable-calico-ebpf
 
 # To revert back to iptables dataplane
@@ -567,6 +611,11 @@ just disable-calico-ebpf
 - x86-64 or arm64 architecture
 - Cannot mix eBPF and standard dataplane nodes
 - VXLAN is used instead of IPIP for tunneling
+
+**DSR Mode Benefits**:
+- Improved performance by bypassing kube-proxy for return traffic
+- Lower latency for external traffic
+- Better compatibility with Istio ambient mesh
 
 #### Custom Configuration
 
@@ -699,7 +748,7 @@ sops -e -i .secrets.enc.env
 | `setup-calico` | Complete Calico setup | - | `CNI_TYPE`, `CLUSTER_NAME` |
 | `setup-calico-ebpf` | Calico with eBPF setup | - | `CNI_TYPE`, `CLUSTER_NAME` |
 | `status` | Show cluster status | - | `CLUSTER_NAME` |
-| `test-connectivity` | Test network connectivity | - | - |
+| `test-connectivity` | Test cross-node network connectivity | - | `CNI_TYPE` |
 
 ### k3d Configuration
 
@@ -927,28 +976,48 @@ cat infrastructure/k3d/calico-config.yaml | grep cluster-cidr
 
 #### 5. Connectivity Test Issues
 
-**Problem**: Connectivity test fails on first run with "Operation not permitted"
+**Problem**: Cross-node connectivity test fails
 
 ```bash
 wget: can't connect to remote host (10.x.x.x): Operation not permitted
+# or
+❌ Connectivity test FAILED - HTTP 200 not received
 ```
 
 **Solution**:
 
-This is a race condition where the CNI hasn't fully configured network policies before the test runs.
+The `test-connectivity` target now uses manifest files to create:
+- An nginx deployment with a service
+- A busybox pod with pod anti-affinity to ensure it runs on a different node
+
+This tests true cross-node connectivity, which is important when using:
+- Calico eBPF mode with DSR (Direct Server Return)
+- Istio in ambient mesh mode
 
 ```bash
-# The justfile now includes a 5-second delay to allow CNI setup
-# If you still experience issues, increase the delay or check CNI status:
+# The test now includes proper error handling:
+# - Success: ✅ Connectivity test PASSED - HTTP 200 received
+# - Failure: ❌ Connectivity test FAILED - HTTP 200 not received
 
-# For Calico
-kubectl get pods -n calico-system -o wide
+# If the test fails, check:
+
+# 1. Verify pods are on different nodes
+kubectl get pods -o wide
+
+# 2. Check Calico eBPF status
+kubectl get felixconfiguration default -o yaml | grep -E "bpfEnabled|bpfExternalServiceMode|bpfConnectTimeLoadBalancing"
+
+# 3. Check Calico node logs
 kubectl logs -n calico-system -l k8s-app=calico-node | tail -50
 
-# For Cilium
-kubectl get pods -n kube-system -l k8s-app=calico
-calico status
+# 4. Verify service endpoints
+kubectl get endpoints nginx
+
+# 5. Test connectivity manually
+kubectl exec -it busybox -- wget -O- http://nginx
 ```
+
+**Note**: The test uses `--force --grace-period=0` for cleanup to ensure resources are removed even if pods are stuck.
 
 ### Debug Commands
 
@@ -1353,6 +1422,79 @@ curl http://localhost:9091/metrics | grep felix
 # - felix_iptables_restore_calls
 # - felix_ipset_calls
 # - felix_route_table_list_seconds
+```
+
+### Cross-Node Connectivity Testing
+
+The repository includes a comprehensive connectivity test that validates cross-node communication, which is crucial when using advanced networking features like:
+- Calico eBPF dataplane with DSR mode
+- Istio ambient mesh
+- Complex network policies
+
+#### Test Architecture
+
+The `test-connectivity` target creates:
+
+1. **Nginx Deployment and Service** (`infrastructure/manifests/nginx.yaml`):
+   - Single replica nginx deployment
+   - ClusterIP service exposing port 80
+   - Resource limits for stability
+
+2. **BusyBox Test Pod** (`infrastructure/manifests/busybox.yaml`):
+   - Pod with anti-affinity rules to ensure it runs on a different node than nginx
+   - Sleeps for an hour to allow manual testing
+   - Resource limits for stability
+
+#### Running the Test
+
+```bash
+# Run the connectivity test
+just test-connectivity
+
+# The test will:
+# 1. Create nginx deployment and service
+# 2. Create busybox pod on a different node (via anti-affinity)
+# 3. Test HTTP connectivity from busybox to nginx service
+# 4. Report success (✅) or failure (❌)
+# 5. Clean up all resources
+```
+
+#### Understanding Test Results
+
+**Success Output**:
+```
+✅ Connectivity test PASSED - HTTP 200 received
+Basic connectivity test completed successfully.
+```
+
+**Failure Output**:
+```
+❌ Connectivity test FAILED - HTTP 200 not received
+Basic connectivity test failed.
+```
+
+#### Manual Testing
+
+For debugging or manual testing:
+
+```bash
+# Create test resources manually
+kubectl apply -f infrastructure/manifests/nginx.yaml
+kubectl apply -f infrastructure/manifests/busybox.yaml
+
+# Wait for pods to be ready
+kubectl wait --for=condition=ready pod/busybox
+kubectl wait --for=condition=available deployment/nginx
+
+# Verify pods are on different nodes
+kubectl get pods -o wide
+
+# Test connectivity
+kubectl exec -it busybox -- wget -O- http://nginx
+
+# Clean up
+kubectl delete -f infrastructure/manifests/nginx.yaml
+kubectl delete -f infrastructure/manifests/busybox.yaml
 ```
 
 ### Multi-cluster Setup
