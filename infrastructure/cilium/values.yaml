@@ -2,7 +2,7 @@ bpf:
   masquerade: true
 
 cluster:
-  name: clsuter-1
+  name: cluster-1
   id: 1
 
 kubeProxyReplacement: true
@@ -45,12 +45,21 @@ ingressController:
 authentication:
   mutual:
     spire:
-      enabled: false
+      enabled: true
       install:
         enabled: true
         server:
           dataStorage:
             enabled: true
+            storageClass: local-path
+            # For k3d/development, use local-path storage
+            # storageClass: local-path
+            # accessMode: ReadWriteOnce
+            # size: 1Gi
+          # Run as root to write to HostPath socket directory
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
 
 encryption:
   enabled: true
@@ -126,7 +135,7 @@ clustermesh:
   config:
     enabled: true
     clusters:
-    - name: clister-1
+    - name: cluster-1
       # the cluster Clustermesh API server.
       # address: cluster1.mesh.cilium.io
       port: 32379
