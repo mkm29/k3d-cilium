@@ -1,0 +1,33 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
+tasks:
+  - name: validate
+    actions:
+      - description: Validate loki
+        wait:
+          cluster:
+            kind: Pod
+            name: app.kubernetes.io/name=loki
+            namespace: loki
+            condition: Ready
+      - description: Validate uds-loki-dns
+        wait:
+          cluster:
+            kind: Service
+            name: app.kubernetes.io/component=uds-loki-dns
+            namespace: kube-system
+      - description: Validate loki-gw
+        wait:
+          cluster:
+            kind: Pod
+            name: app.kubernetes.io/component=gateway
+            namespace: loki
+            condition: Ready
+
+  - name: e2e-test
+    actions:
+      - description: "Run Loki E2E tests"
+        cmd: |
+          npm ci && npx vitest run "loki" --exclude "**/*integration*"
+        dir: test/vitest

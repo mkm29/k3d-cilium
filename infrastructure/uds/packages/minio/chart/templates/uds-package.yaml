@@ -1,0 +1,49 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
+# yaml-language-server: $schema=https://raw.githubusercontent.com/defenseunicorns/uds-core/refs/heads/main/schemas/package-v1alpha1.schema.json
+
+{{- $packagesCRD := lookup "apiextensions.k8s.io/v1" "CustomResourceDefinition" "" "packages.uds.dev" }}
+{{- if $packagesCRD }}
+apiVersion: uds.dev/v1alpha1
+kind: Package
+metadata:
+  name: minio
+  namespace: {{ .Release.Namespace }}
+spec:
+  # Customize network policies and expose services via istio
+  network:
+    serviceMesh:
+      mode: ambient
+    allow:
+      # Allow egress access to all namespaces
+      - direction: Egress
+        remoteNamespace: "*"
+        selector:
+          app.kubernetes.io/name: minio
+        # port: 443
+        description: "Allow egress to all pods"
+
+      - direction: Ingress
+        remoteNamespace: "*"
+        selector:
+          app.kubernetes.io/name: minio
+        description: "Allow ingress from all pods"
+
+      - direction: Ingress
+        remoteGenerated: IntraNamespace
+
+      - direction: Egress
+        remoteGenerated: IntraNamespace
+        description: "Allow intra-namespace communication"
+
+      # Access to Kubernetes API for scanning resources
+      - direction: Egress
+        remoteGenerated: KubeAPI
+        description: "Access Kubernetes API to scan resources"
+
+      # Custom rules for unanticipated scenarios
+      {{- with .Values.additionalNetworkAllow }}
+      {{ toYaml . | nindent 6 }}
+      {{- end }}
+{{- end }}

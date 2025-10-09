@@ -1,0 +1,115 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
+apiVersion: uds.dev/v1alpha1
+kind: Package
+metadata:
+  name: loki
+  namespace: {{ .Release.Namespace }}
+spec:
+  network:
+    serviceMesh:
+      mode: ambient
+    allow:
+      # Permit intra-namespace communication for gateway -> loki read/write
+      - direction: Ingress
+        remoteGenerated: IntraNamespace
+
+      - direction: Egress
+        remoteGenerated: IntraNamespace
+
+      - direction: Ingress
+        selector:
+          app.kubernetes.io/name: loki
+        remoteNamespace: grafana
+        remoteSelector:
+          app.kubernetes.io/name: grafana
+        remoteServiceAccount: grafana
+        ports:
+          - 8080
+        description: "Grafana Log Queries"
+
+      - direction: Ingress
+        selector:
+          app.kubernetes.io/name: loki
+        remoteNamespace: monitoring
+        remoteSelector:
+          app.kubernetes.io/name: Mimir
+        remoteServiceAccount: kube-Mimir-stack-Mimir
+        ports:
+          - 3100
+        description: "Mimir Metrics"
+
+      # Allow traffic from Grafana Alloy (in kube-system namespace)
+      - direction: Ingress
+        selector:
+          app.kubernetes.io/name: loki
+        remoteNamespace: kube-system
+        remoteSelector:
+          app.kubernetes.io/name: alloy
+        remoteServiceAccount: alloy
+        ports:
+          - 12345
+        description: "Alloy OTEL data"
+
+      - direction: Ingress
+        selector:
+          app.kubernetes.io/name: loki
+        remoteNamespace: falco
+        remoteSelector:
+          app.kubernetes.io/name: falcosidekick
+        remoteServiceAccount: falco-falcosidekick
+        ports:
+          - 8080
+        description: "Falco Sidekick Events"
+
+      - direction: Egress
+        selector:
+          app.kubernetes.io/name: loki
+        remoteNamespace: monitoring
+        remoteSelector:
+          app.kubernetes.io/name: alertmanager
+        ports:
+          - 9093
+        description: "Loki Ruler Alerts to Alertmanager"
+
+      - direction: Egress
+        selector:
+          app.kubernetes.io/name: loki
+        remoteNamespace: monitoring
+        remoteSelector:
+          app.kubernetes.io/name: mimir
+        ports:
+          - 9090
+        description: "Loki Ruler Recording Rules to Mimir"
+
+      # Alloy egress traffic to send logs to minio in uds-dev-stack namespace
+      - direction: Egress
+        selector:
+          app.kubernetes.io/name: loki
+        remoteNamespace: uds-dev-stack
+        remoteSelector:
+          app.kubernetes.io/name: minio
+        ports:
+          - 9000
+        description: "Loki to MinIO"
+
+      # Egress for S3 connections
+      - direction: Egress
+        selector:
+          app.kubernetes.io/name: loki
+        description: Storage
+        {{- if .Values.storage.internal.enabled }}
+        remoteSelector:
+          {{- .Values.storage.internal.remoteSelector | toYaml | nindent 10 }}
+        remoteNamespace: {{ .Values.storage.internal.remoteNamespace }}
+        {{- else if .Values.storage.egressCidr }}
+        remoteCidr: {{ .Values.storage.egressCidr }}
+        {{- else }}
+        remoteGenerated: Anywhere
+        {{- end }}
+
+      # Custom rules for additional networking access
+      {{- with .Values.additionalNetworkAllow }}
+      {{ toYaml . | nindent 6 }}
+      {{- end }}

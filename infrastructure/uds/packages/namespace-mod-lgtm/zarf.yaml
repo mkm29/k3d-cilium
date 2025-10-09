@@ -1,0 +1,48 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
+# yaml-language-server: $schema=https://raw.githubusercontent.com/defenseunicorns/zarf/main/zarf.schema.json
+kind: ZarfPackageConfig
+metadata:
+  name: namespace-mod-lgtm
+  description: "Package to make and add labels to all namespaces for LGTM bundle"
+  version: 0.1.0-lgtm.0
+  yolo: false
+
+components:
+  - name: namespace-mod-core
+    required: true
+    actions:
+      onDeploy:
+        before:
+          - cmd: |
+              # namespaces that are created in uds-core bundle deployment
+              namespaces=(
+                authservice
+                grafana
+                istio-system
+                istio-admin-gateway
+                istio-tenant-gateway
+                keycloak
+                loki
+                minio
+                minio-operator
+                monitoring
+                pepr
+                pepr-system
+                postgres
+                postgres-operator
+              )
+
+              for ns in "${namespaces[@]}"; do
+                # Create the namespace if it doesn't exist
+                uds zarf tools kubectl get ns "$ns" >/dev/null 2>&1 || uds zarf tools kubectl create namespace "$ns"
+
+                # Apply the pod security labels
+                uds zarf tools kubectl label ns "$ns" pod-security.kubernetes.io/audit=privileged --overwrite
+                uds zarf tools kubectl label ns "$ns" pod-security.kubernetes.io/enforce=privileged --overwrite
+                uds zarf tools kubectl label ns "$ns" pod-security.kubernetes.io/warn=privileged --overwrite
+              done
+
+              clusterName=$(uds zarf tools kubectl config current-context)
+

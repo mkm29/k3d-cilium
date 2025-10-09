@@ -1,0 +1,107 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
+loki:
+  image:
+    registry: docker.io
+    repository: grafana/loki
+    tag: 3.5.5
+
+  appProtocol: "tcp"
+
+queryFrontend:
+  appProtocol:
+    # -- Set the optional grpc service protocol. Ex: "grpc", "http2" or "https"
+    grpc: "grpc"
+
+queryScheduler:
+  # -- Specifies whether the query-scheduler should be decoupled from the query-frontend
+  enabled: true
+  appProtocol:
+    grpc: "grpc"
+
+serviceMonitor:
+  enabled: true
+
+prometheusRule:
+  enabled: true
+
+gateway:
+  image:
+    registry: docker.io
+    repository: nginxinc/nginx-unprivileged
+    tag: 1.29-alpine
+  appProtocol: "tcp"
+  # Basic auth configuration
+  basicAuth:
+    # -- Enables basic authentication for the gateway
+    enabled: false
+    # -- The basic auth username for the gateway
+    username: null
+    # -- The basic auth password for the gateway
+    password: null
+
+memcached:
+  image:
+    registry: docker.io
+    repository: memcached
+    tag: 1.6.39-alpine
+  appProtocol: "tcp"
+
+memcachedFrontend:
+  # -- Specifies whether the Memcached frontend cache should be enabled
+  enabled: true
+
+memcachedIndexQueries:
+  # -- Specifies whether the Memcached index queries cache should be enabled
+  enabled: true
+
+memcachedIndexWrites:
+  # -- Specifies whether the Memcached index writes cache should be enabled
+  enabled: true
+
+memcachedExporter:
+  # -- Specifies whether the Memcached Exporter should be enabled
+  enabled: true
+  image:
+    # -- The Docker registry for the Memcached Exporter
+    registry: docker.io
+    # -- Memcached Exporter Docker image repository
+    repository: prom/memcached-exporter
+    # -- Memcached Exporter Docker image tag
+    tag: v0.15.3
+
+memcachedChunks:
+  # -- Specifies whether the Memcached chunks cache should be enabled
+  enabled: true
+
+tableManager:
+  # -- Specifies whether the table-manager should be enabled
+  enabled: true
+
+# Should create a priorityClass for loki pods
+
+ingester:
+  appProtocol: "tcp"
+
+distributor:
+  appProtocol: "tcp"
+
+querier:
+  appProtocol: "tcp"
+
+compactor:
+  enabled: true
+  kind: Deployment # use StatefulSet if enabling persistent storage
+  appProtocol:
+    grpc: "grpc"
+
+ruler:
+  enabled: true
+  appProtocol:
+    grpc: "grpc"
+
+indexGateway:
+  enabled: true
+  appProtocol:
+    grpc: "grpc"

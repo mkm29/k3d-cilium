@@ -1,0 +1,27 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
+kind: ZarfPackageConfig
+metadata:
+  name: loki
+  description: "UDS LGTM Loki"
+  version: 0.1.0-lgtm.0
+  yolo: false
+
+components:
+  - name: loki
+    required: true
+    description: "Install Loki using upstream (docker) images"
+    only:
+      flavor: "upstream"
+    import:
+      path: common
+    charts:
+      - name: loki
+        valuesFiles:
+          - ./values/upstream-values.yaml
+    images:
+      - docker.io/grafana/loki:3.5.5
+      - docker.io/memcached:1.6.39-alpine
+      - docker.io/nginxinc/nginx-unprivileged:1.29-alpine
+      - docker.io/prom/memcached-exporter:v0.15.3

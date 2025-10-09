@@ -1,0 +1,33 @@
+shared:
+  CNI_CONF_DIR: /etc/cni/net.d
+  CNI_BIN_DIR: /opt/cni/bin
+# variables:
+#   loki:
+#     loki:
+#       LOKI_CHUNKS_BUCKET: loki-chunks
+#       LOKI_RULER_BUCKET: loki-ruler
+#       LOKI_ADMIN_BUCKET: loki-admin
+#       LOKI_S3_ACCESS_KEY_ID: loki
+#       LOKI_S3_SECRET_ACCESS_KEY: lokipass
+#   core-base:
+#     istio-controlplane:
+#       base:
+#         CNI_CONF_DIR: /etc/cni/net.d
+#         CNI_BIN_DIR: /opt/cni/bin
+#       istiod:
+#         CNI_CONF_DIR: /etc/cni/net.d
+#         CNI_BIN_DIR: /opt/cni/bin
+#       cni:
+#         CNI_CONF_DIR: /etc/cni/net.d
+#         CNI_BIN_DIR: /opt/cni/bin
+#       ztunnel:
+#         CNI_CONF_DIR: /etc/cni/net.d
+#         CNI_BIN_DIR: /opt/cni/bin
+#     istio-admin-gateway:
+#       uds-istio-config:
+#         CNI_CONF_DIR: /etc/cni/net.d
+#         CNI_BIN_DIR: /opt/cni/bin
+#     istio-tenant-gateway:
+#       uds-istio-config:
+#         CNI_CONF_DIR: /etc/cni/net.d
+#         CNI_BIN_DIR: /opt/cni/bin

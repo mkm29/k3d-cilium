@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: busybox
+  name: busybox
+spec:
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - nginx
+          topologyKey: "kubernetes.io/hostname"
+  containers:
+  - image: busybox
+    name: busybox
+    command: ["sh", "-c", "echo Hello Kubernetes! && sleep 3600"]
+    resources:
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+  restartPolicy: Never

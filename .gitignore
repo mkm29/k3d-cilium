@@ -94,3 +94,4 @@ coverage/
 .hypothesis/
 .pytest_cache/
 .claude
+*.tar.zst

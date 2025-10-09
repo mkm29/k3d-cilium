@@ -1,0 +1,44 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
+kind: ZarfPackageConfig
+metadata:
+  name: core-secrets
+  description: "secret management for core components"
+  version: 0.1.0-lgtm.0
+  yolo: false
+
+components:
+  - name: core-secrets
+    required: true
+    actions:
+      onDeploy:
+        before:
+          # - cmd: uds zarf tools kubectl get secret -n keycloak keycloak.keycloak.pg-cluster.credentials.postgresql.acid.zalan.do --template={{.data.password}} | base64 -d
+          #   mute: true
+          #   setVariables:
+          #     - name: KC_DB_PASSWORD
+          #       sensitive: true
+          # - cmd: uds zarf tools kubectl get secret -n grafana grafana.grafana.pg-cluster.credentials.postgresql.acid.zalan.do --template={{.data.password}} | base64 -d
+          #   mute: true
+          #   setVariables:
+          #     - name: GRAFANA_DB_PASSWORD
+          #       sensitive: true
+          - cmd: uds zarf tools kubectl get secret -n logging loki-minio --template={{.data.access_key}} | base64 -d
+            mute: true
+            setVariables:
+              - name: LOKI_S3_ACCESS_KEY_ID
+                sensitive: true
+          - cmd: uds zarf tools kubectl get secret -n logging loki-minio --template={{.data.secret_key}} | base64 -d
+            mute: true
+            setVariables:
+              - name: LOKI_S3_SECRET_ACCESS_KEY
+          # - cmd: uds zarf tools kubectl get secret -n monitoring mimir-minio --template={{.data.access_key}} | base64 -d
+          #   mute: true
+          #   setVariables:
+          #     - name: MIMIR_S3_ACCESS_KEY_ID
+          #       sensitive: true
+          # - cmd: uds zarf tools kubectl get secret -n monitoring mimir-minio --template={{.data.secret_key}} | base64 -d
+          #   mute: true
+          #   setVariables:
+          #     - name: MIMIR_S3_SECRET_ACCESS_KEY

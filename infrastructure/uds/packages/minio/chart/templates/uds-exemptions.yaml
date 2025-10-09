@@ -1,0 +1,38 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
+# yaml-language-server: $schema=https://raw.githubusercontent.com/defenseunicorns/uds-core/refs/heads/main/schemas/exemption-v1alpha1.schema.json#distinct_id=01976a64-cb3a-767a-932b-9665e4c6cd9d&session_id=01980e6b-9dfc-7e84-9ef7-5fa585f0f7a3
+{{- $exemptionsCRD := lookup "apiextensions.k8s.io/v1" "CustomResourceDefinition" "" "exemptions.uds.dev" }}
+{{- if $exemptionsCRD }}
+apiVersion: {{.Values.apiVersion | default "uds.dev/v1alpha1" }}
+kind: Exemption
+metadata:
+  name: minio-exemptions
+  namespace: uds-policy-exemptions
+  annotations:
+    {{- include "uds-minio-config.annotations" . | nindent 4 }}
+  {{- if .Values.annotations }}
+  {{- toYaml .Values.annotations | nindent 4 }}
+  {{- end}}
+  labels:
+    {{- include "uds-minio-config.labels" . | nindent 4 }}
+  {{- if .Values.labels }}
+  {{- toYaml .Values.labels | nindent 4 }}
+  {{- end }}
+spec:
+  exemptions:
+    - description: Exemptions necessary for minio to collect logs and metrics from host paths
+      matcher:
+        name: "^.*minio.*"
+        namespace: {{ .Release.Namespace }}
+      policies:
+        - RequireNonRootUser
+        - RestrictVolumeTypes
+        - DisallowHostNamespaces
+        - RestrictCapabilities
+        - RestrictHostPathWrite
+        - RestrictHostPorts
+        - RestrictSELinuxType
+        - DisallowPrivileged
+      title: minio exemptions
+{{- end }}

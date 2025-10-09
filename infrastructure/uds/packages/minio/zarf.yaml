@@ -1,0 +1,25 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
+# yaml-language-server: $schema=https://raw.githubusercontent.com/defenseunicorns/zarf/main/zarf.schema.json
+kind: ZarfPackageConfig
+metadata:
+  name: minio
+  description: "UDS MinIO"
+  version: 0.1.0-lgtm.0
+
+components:
+  - name: minio
+    required: true
+    description: "Install MinIO using upstream (docker) images"
+    only:
+      flavor: "upstream"
+    import:
+      path: common
+    charts:
+      - name: minio
+        valuesFiles:
+          - ./values/upstream-values.yaml
+    images:
+      - quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+      - quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z

@@ -1,0 +1,232 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
+kind: UDSBundle
+metadata:
+  name: lgtm
+  description: UDS bundle for horizontally scalable LGTM observability stack
+  version: 0.1.0-lgtm.0-upstream
+
+packages:
+  - name: init
+    repository: ghcr.io/zarf-dev/packages/init
+    ref: v0.63.0@sha256:51590197b6e65193315baa2413fa9db16f235c63bb81fa5d8464e121dae2fd0c
+
+  # Deploy uds-core base functional layer which includes istio, uds-operator, and uds CRDs
+  - name: core-base
+    # renovate: image=registry.defenseunicorns.com/sld-45/core-base
+    repository: ghcr.io/defenseunicorns/packages/uds/core-base
+    ref: 0.53.0-upstream@sha256:ad4f9b15b58a01d67b6a3a00c32e583ecce5b65af7f57b663bef990ba7057ec8
+    overrides:
+      pepr-uds-core:
+        module:
+          values:
+            - path: additionalIgnoredNamespaces
+              value:
+                - keycloak
+                - minio
+                - minio-operator
+                - postgres
+                - postgres-operator
+                - loki
+                - kube-system
+      istio-controlplane:
+        cni:
+          values:
+            - path: cniConfDir
+              value: "/etc/cni/net.d"
+            - path: cniBinDir
+              value: "/opt/cni/bin"
+        istiod:
+          values:
+            - path: _internal_defaults_do_not_set.cni.enabled
+              value: true
+            - path: _internal_defaults_do_not_set.cni.provider
+              value: cilium
+
+  - name: namespace-mod-lgtm
+    path: build/
+    ref: 0.1.0-lgtm.0-upstream
+
+  # - name: minio
+  #   path: build/
+  #   ref: 0.1.0-lgtm.0
+
+  # - name: minio-operator
+  #   repository: ghcr.io/defenseunicorns/packages/uds/minio-operator
+  #   ref: 7.1.1-uds.4-upstream@sha256:2f37ce60167d249b8a93ddf25119af244442b7a797a43a0112ecb8085c44b2b2
+  #   overrides:
+  #     minio-operator:
+  #       uds-minio-config:
+  #         values:
+  #           - path: mimir
+  #             value:
+  #               - name: loki
+  #                 namespace: loki
+  #                 bucketNames:
+  #                   - loki-chunks
+  #                   - loki-ruler
+  #                   - loki-admin
+  #                 policy: ""
+  #                 copyPassword:
+  #                   enabled: true
+  #                   secretName: "loki-minio"
+  #                   secretIDKey: "access_key"
+  #                   secretPasswordKey: "secret_key"
+  #       minio-tenant:
+  #         values:
+  #           - path: tenant.pools
+  #             value:
+  #               - servers: 1
+  #                 name: pool-0
+  #                 volumesPerServer: 4
+  #                 size: 10Gi
+
+  # - name: postgres-operator
+  #   repository: registry.defenseunicorns.com/sld-45/postgres-operator
+  #   ref: 1.14.0-uds.9-unicorn
+  #   overrides:
+  #     postgres-operator:
+  #       uds-postgres-config:
+  #         values:
+  #           - path: postgresql
+  #             value:
+  #               enabled: true
+  #               teamId: "uds"
+  #               volume:
+  #                 size: "3Gi"
+  #               numberOfInstances: 2
+  #               users:
+  #                 keycloak.keycloak: [] # database owner
+  #                 grafana.grafana: []
+  #               databases:
+  #                 keycloakdb: keycloak.keycloak
+  #                 grafanadb: grafana.grafana
+  #               version: "14"
+  #               ingress:
+  #                 - remoteNamespace: keycloak
+  #                 - remoteNamespace: grafana
+
+  # - name: core-secrets
+  #   path: build/
+  #   ref: 0.1.0-lgtm.0-upstream
+  #   exports:
+  #     - name: LOKI_S3_ACCESS_KEY_ID
+  #     - name: LOKI_S3_SECRET_ACCESS_KEY
+  #     - name: MIMIR_S3_ACCESS_KEY_ID
+  #     - name: MIMIR_S3_SECRET_ACCESS_KEY
+
+  # UDS core identity layer which includes keycloak and auth service
+  # - name: core-identity-authorization
+  #   repository: registry.defenseunicorns.com/sld-45/core-identity-authorization
+  #   ref: 0.53.0-unicorn
+  #   imports:
+  #     - name: KC_DB_PASSWORD
+  #       package: core-secrets
+  #   overrides:
+  #     keycloak:
+  #       keycloak:
+  #         values:
+  #           - path: devMode
+  #             value: false
+  #           - path: postgresql.database
+  #             value: keycloakdb
+  #           - path: postgresql.username
+  #             value: keycloak.keycloak
+  #           - path: postgresql.host
+  #             value: pg-cluster.postgres.svc.cluster.local
+  #           - path: insecureAdminPasswordGeneration.enabled
+  #             value: true
+  #           - path: resources.limits.memory
+  #             value: "3Gi"
+  #         variables:
+  #           - name: KC_DB_PASSWORD
+  #             path: postgresql.password
+
+  # # UDS core runtime security layer which includes neuvector
+  # - name: core-runtime-security
+  #   repository: registry.defenseunicorns.com/sld-45/core-runtime-security
+  #   ref: 0.50.0-registry1
+
+  # Loki distributed logging package
+  # - name: loki
+  #   path: build/
+  #   ref: 0.1.0-lgtm.0-upstream
+    # imports:
+    #   - name: LOKI_S3_ACCESS_KEY_ID
+    #     package: core-secrets
+    #   - name: LOKI_S3_SECRET_ACCESS_KEY
+    #     package: core-secrets
+    # overrides:
+    #   loki:
+    #     loki:
+    #       variables:
+    #         - name: LOKI_CHUNKS_BUCKET
+    #           description: "The object storage bucket for Loki chunks"
+    #           path: loki.storage.bucketNames.chunks
+    #           default: "loki-chunks"
+    #         - name: LOKI_RULER_BUCKET
+    #           description: "The object storage bucket for Loki ruler"
+    #           path: loki.storage.bucketNames.ruler
+    #           default: "loki-ruler"
+    #         - name: LOKI_ADMIN_BUCKET
+    #           description: "The object storage bucket for Loki admin"
+    #           path: loki.storage.bucketNames.admin
+    #           default: "loki-admin"
+    #         - name: LOKI_S3_REGION
+    #           description: "The S3 region"
+    #           path: loki.storage.s3.region
+    #           default: ""
+    #         - name: LOKI_S3_ACCESS_KEY_ID # imported from core-secrets package
+    #           description: "The S3 Access Key ID"
+    #           path: loki.storage.s3.accessKeyId
+    #         - name: LOKI_S3_SECRET_ACCESS_KEY # imported from core-secrets package
+    #           path: loki.storage.s3.secretAccessKey
+    #           description: "The S3 Secret Access Key"
+    #       values:
+    #         - path: loki.storage.type
+    #           value: "s3"
+    #         - path: loki.storage.s3.endpoint
+    #           value: "http://uds-minio-hl.minio.svc.cluster.local:9000"
+
+  # # UDS core monitoring stack which includes prometheus and Grafana
+  # - name: core-monitoring
+  #   repository: registry.defenseunicorns.com/sld-45/core-monitoring
+  #   ref: 0.50.0-registry1
+  #   imports:
+  #     - name: GRAFANA_DB_PASSWORD
+  #       package: core-secrets
+  #   overrides:
+  #     kube-prometheus-stack:
+  #       kube-prometheus-stack:
+  #         values:
+  #           - path: kube-state-metrics.resources.limits.memory
+  #             value: 512Mi
+  #           - path: prometheusOperator.tls.tlsMinVersion
+  #             value: VersionTLS12
+  #           - path: alertmanager.alertmanagerSpec.scheme
+  #             value: https
+  #         variables:
+  #           - name: PROMETHEUS_PVC_SIZE
+  #             path: prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage
+  #             default: 50Gi
+  #     grafana:
+  #       uds-grafana-config:
+  #         variables:
+  #           - name: GRAFANA_PG_HOST
+  #             description: Grafana postgresql host
+  #             path: postgresql.host
+  #           - name: GRAFANA_PG_PORT
+  #             description: Grafana postgresql port
+  #             path: postgresql.port
+  #           - name: GRAFANA_PG_DATABASE
+  #             description: Grafana postgresql database
+  #             path: postgresql.database
+  #           - name: GRAFANA_DB_PASSWORD
+  #             path: postgresql.password
+  #           - name: GRAFANA_PG_USER
+  #             description: Grafana postgresql username
+  #             path: postgresql.user
+  #           - name: GRAFANA_PG_SSL_MODE
+  #             description: Grafana postgresql SSL mode
+  #             path: postgresql.ssl_mode
