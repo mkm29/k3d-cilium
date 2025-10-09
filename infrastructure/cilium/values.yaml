@@ -2,10 +2,13 @@ bpf:
   masquerade: true
 
 cluster:
-  name: k3d-cilium
-  id: 99
+  name: clsuter-1
+  id: 1
 
 kubeProxyReplacement: true
+l7Proxy: false
+# k8sServiceHost: 10.96.0.1
+# k8sServicePort: 443
 
 hubble:
   enabled: true
@@ -20,29 +23,29 @@ hubble:
     dashboards:
       enabled: true
     serviceMonitor:
-      enabled: true
+      enabled: false
   relay:
     enabled: true
     prometheus:
-      enabled: true
+      enabled: false
       serviceMonitor:
-        enabled: true
+        enabled: false
   tls:
     auto:
       enabled: true
       method: "helm"
-      certValidityDuration: "1095"
+      certValidityDuration: 365
   ui:
     enabled: true
 
 ingressController:
-  enabled: true
-  default: true
+  enabled: false
+  default: false
 
 authentication:
   mutual:
     spire:
-      enabled: true
+      enabled: false
       install:
         enabled: true
         server:
@@ -60,25 +63,25 @@ encryption:
 prometheus:
   enabled: true
   serviceMonitor:
-    enabled: true
+    enabled: false
 dashboards:
   enabled: true
 
 
 # version: 1.17.4
 operator:
-  replicas: 1
+  replicas: 2
   prometheus:
     enabled: true
     serviceMonitor:
-      enabled: true
+      enabled: false
   dashboards:
     enabled: true
 envoy:
   prometheus:
     enabled: true
     serviceMonitor:
-      enabled: true
+      enabled: false
     service:
       type: NodePort
 #     # tls:
@@ -89,13 +92,10 @@ envoy:
 
 ipam:
   mode: kubernetes
+#   mode: cluster-pool
+# clusterPoolIPv4PodCIDRList:
+#   - 10.0.0.0/9
 
-externalIPs:
-  enabled: true
-nodePort:
-  enabled: true
-hostPort:
-  enabled: true
 socketLB:
   enabled: true
   hostNamespaceOnly: true
@@ -111,3 +111,30 @@ monitor:
 #   nodePort:
 #     # -- Enable the Cilium NodePort service implementation.
 #     enabled: true
+
+l2announcements:
+  enabled: true
+
+# --- Cluster Mesh control-plane ---
+clustermesh:
+  useAPIServer: true
+  enableEndpointSliceSynchronization: true
+  apiserver:
+    service:
+      type: NodePort
+      nodePort: 32379
+  config:
+    enabled: true
+    clusters:
+    - name: clister-1
+      # the cluster Clustermesh API server.
+      # address: cluster1.mesh.cilium.io
+      port: 32379
+      ips:
+      - 10.42.0.3
+    - name: cluster-2
+      # the cluster Clustermesh API server.
+      # address: cluster1.mesh.cilium.io
+      port: 32380
+      ips:
+      - 10.42.0.8

@@ -5,17 +5,20 @@ metadata:
 servers: 1
 agents: 2
 image: rancher/k3s:v1.32.5-k3s1
-subnet: "10.42.0.0/16"
-ports:
-  - port: 8080:80
-    nodeFilters:
-      - loadbalancer
+subnet: "10.0.0.0/9"
+# ports:
+#   - port: 80:80
+#     nodeFilters:
+#       - loadbalancer
+#   - port: 443:443
+#     nodeFilters:
+#       - loadbalancer
 # network: k3d
 options:
   k3d:
     wait: true
     timeout: "6m0s"
-    disableLoadbalancer: true
+    disableLoadbalancer: false
     disableImageVolume: false
     disableRollback: false
   k3s:
@@ -36,9 +39,15 @@ options:
       - arg: --disable=servicelb
         nodeFilters:
           - server:*
-      - arg: --disable-kube-proxy
+      - arg: --disable=metrics-server
         nodeFilters:
           - server:*
+      # - arg: --disable=local-storage
+      #   nodeFilters:
+      #     - server:*
+      # - arg: --disable-kube-proxy
+      #   nodeFilters:
+      #     - server:*
       - arg: --cluster-cidr=10.42.0.0/16
         nodeFilters:
           - server:*
